@@ -19,7 +19,8 @@ import {
   X,
   Crown,
   Copy,
-  Eraser
+  Eraser,
+  Lightbulb
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -74,10 +75,13 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
   const [isDrawing, setIsDrawing] = useState(false)
   const [cloneSrc, setCloneSrc] = useState<{ x: number; y: number } | null>(null)
   const [tool, setTool] = useState<'erase' | 'clone' | null>(null)
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
+  const cursorCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const [adjustments, setAdjustments] = useState({
     brightness: 100,
@@ -98,6 +102,35 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
       applyAdjustments()
     }
   }, [adjustments, selectedFilter])
+
+  useEffect(() => {
+    if (cursorCanvasRef.current && canvasRef.current) {
+      cursorCanvasRef.current.width = canvasRef.current.offsetWidth
+      cursorCanvasRef.current.height = canvasRef.current.offsetHeight
+    }
+  }, [selectedImage, tool])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedImage) return
+
+      if (e.key === 'Escape') {
+        setTool(null)
+        setCloneSrc(null)
+      } else if (e.key === 'e' && !e.ctrlKey && !e.metaKey) {
+        setTool(prev => prev === 'erase' ? null : 'erase')
+      } else if (e.key === 'c' && !e.ctrlKey && !e.metaKey) {
+        setTool(prev => prev === 'clone' ? null : 'clone')
+      } else if (e.key === '[' && brushSize > 10) {
+        setBrushSize(prev => Math.max(10, prev - 10))
+      } else if (e.key === ']' && brushSize < 150) {
+        setBrushSize(prev => Math.min(150, prev + 10))
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedImage, brushSize])
 
   const loadImageToCanvas = () => {
     if (!selectedImage || !canvasRef.current) return
@@ -179,6 +212,10 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
     const file = e.target.files?.[0]
     if (!file) return
 
+    loadImageFile(file)
+  }
+
+  const loadImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file')
       return
@@ -189,9 +226,51 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
       setSelectedImage(event.target?.result as string)
       setEditedImage(null)
       setActiveTab('adjust')
+      setAdjustments({
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        blur: 0,
+        sharpness: 0,
+      })
+      setSelectedFilter('none')
+      setTool(null)
       toast.success('Image loaded successfully')
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      loadImageFile(file)
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile()
+        if (file) {
+          loadImageFile(file)
+          break
+        }
+      }
+    }
   }
 
   const handleRemoveBackground = async () => {
@@ -269,7 +348,7 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
 
     if (tool === 'clone' && e.shiftKey) {
       setCloneSrc({ x, y })
-      toast.info('Clone source set. Click to paste.')
+      toast.success('Clone source set! Click to paint.')
       return
     }
 
@@ -278,13 +357,61 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
   }
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !tool || !canvasRef.current) return
+    if (!canvasRef.current) return
 
     const rect = canvasRef.current.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
+    setCursorPos({ x, y })
+    drawCursor(x, y)
+
+    if (!isDrawing || !tool) return
     applyToolAtPoint(x, y)
+  }
+
+  const handleCanvasMouseLeave = () => {
+    setIsDrawing(false)
+    setCursorPos(null)
+    if (cursorCanvasRef.current) {
+      const ctx = cursorCanvasRef.current.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, cursorCanvasRef.current.width, cursorCanvasRef.current.height)
+      }
+    }
+  }
+
+  const drawCursor = (x: number, y: number) => {
+    if (!tool || !cursorCanvasRef.current) return
+
+    const canvas = cursorCanvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    
+    ctx.strokeStyle = tool === 'clone' ? '#70f' : '#f70'
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 5])
+    ctx.beginPath()
+    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    if (tool === 'clone' && cloneSrc) {
+      ctx.strokeStyle = '#0f7'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(cloneSrc.x, cloneSrc.y, brushSize / 2, 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.strokeStyle = '#0f7'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(cloneSrc.x, cloneSrc.y)
+      ctx.lineTo(x, y)
+      ctx.stroke()
+    }
   }
 
   const handleCanvasMouseUp = () => {
@@ -400,30 +527,51 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
           <Card className="p-6">
             {!selectedImage ? (
               <div
-                className="border-2 border-dashed border-border rounded-lg p-12 text-center cursor-pointer hover:border-primary transition-colors"
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all",
+                  isDragOver 
+                    ? "border-primary bg-primary/5 scale-[1.02]" 
+                    : "border-border hover:border-primary hover:bg-primary/5"
+                )}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onPaste={handlePaste}
+                tabIndex={0}
               >
-                <Upload size={64} className="mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Upload an image to edit</h3>
+                <Upload size={64} className={cn(
+                  "mx-auto mb-4 transition-colors",
+                  isDragOver ? "text-primary" : "text-muted-foreground"
+                )} />
+                <h3 className="text-lg font-semibold mb-2">
+                  {isDragOver ? 'Drop image here' : 'Upload an image to edit'}
+                </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Click to browse or drag and drop
+                  Click to browse, drag & drop, or paste from clipboard
                 </p>
                 <Button>Select Image</Button>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="relative bg-muted rounded-lg overflow-hidden flex items-center justify-center min-h-[400px]">
-                  <canvas
-                    ref={canvasRef}
-                    className={cn(
-                      "max-w-full max-h-[600px] w-auto h-auto",
-                      tool && "cursor-crosshair"
+                  <div className="relative">
+                    <canvas
+                      ref={canvasRef}
+                      className="max-w-full max-h-[600px] w-auto h-auto"
+                      onMouseDown={handleCanvasMouseDown}
+                      onMouseMove={handleCanvasMouseMove}
+                      onMouseUp={handleCanvasMouseUp}
+                      onMouseLeave={handleCanvasMouseLeave}
+                    />
+                    {tool && (
+                      <canvas
+                        ref={cursorCanvasRef}
+                        className="absolute inset-0 pointer-events-none"
+                        style={{ cursor: 'none' }}
+                      />
                     )}
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleCanvasMouseMove}
-                    onMouseUp={handleCanvasMouseUp}
-                    onMouseLeave={handleCanvasMouseUp}
-                  />
+                  </div>
                   {isProcessing && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                       <div className="bg-card p-6 rounded-lg text-center">
@@ -468,7 +616,7 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
           </Card>
 
           <div className="space-y-4">
-            <TabsContent value="upload" className="mt-0">
+            <TabsContent value="upload" className="mt-0 space-y-4">
               <Card className="p-6">
                 <h3 className="font-semibold mb-4">Getting Started</h3>
                 <div className="space-y-3 text-sm text-muted-foreground">
@@ -479,14 +627,62 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                   <p>• Clone and erase tools for precise edits</p>
                 </div>
               </Card>
+
+              <Card className="p-6">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Lightbulb size={18} weight="fill" className="text-primary" />
+                  Keyboard Shortcuts
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Eraser Tool</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">E</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Clone Tool</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">C</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Deselect Tool</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">ESC</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Increase Brush</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">]</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Decrease Brush</span>
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">[</kbd>
+                  </div>
+                </div>
+              </Card>
             </TabsContent>
 
             <TabsContent value="adjust" className="mt-0 space-y-4">
               <Card className="p-6 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm">Color Adjustments</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAdjustments(prev => ({
+                      ...prev,
+                      brightness: 100,
+                      contrast: 100,
+                      saturation: 100
+                    }))}
+                    className="h-7 text-xs"
+                  >
+                    <ArrowCounterClockwise size={14} className="mr-1" />
+                    Reset
+                  </Button>
+                </div>
+
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Brightness: {adjustments.brightness}%
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium">Brightness</label>
+                    <span className="text-sm text-muted-foreground">{adjustments.brightness}%</span>
+                  </div>
                   <Slider
                     value={[adjustments.brightness]}
                     onValueChange={(v) => setAdjustments(prev => ({ ...prev, brightness: v[0] }))}
@@ -497,9 +693,10 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Contrast: {adjustments.contrast}%
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium">Contrast</label>
+                    <span className="text-sm text-muted-foreground">{adjustments.contrast}%</span>
+                  </div>
                   <Slider
                     value={[adjustments.contrast]}
                     onValueChange={(v) => setAdjustments(prev => ({ ...prev, contrast: v[0] }))}
@@ -510,9 +707,10 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Saturation: {adjustments.saturation}%
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium">Saturation</label>
+                    <span className="text-sm text-muted-foreground">{adjustments.saturation}%</span>
+                  </div>
                   <Slider
                     value={[adjustments.saturation]}
                     onValueChange={(v) => setAdjustments(prev => ({ ...prev, saturation: v[0] }))}
@@ -524,10 +722,28 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
 
                 <Separator />
 
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Effects</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAdjustments(prev => ({
+                      ...prev,
+                      blur: 0,
+                      sharpness: 0
+                    }))}
+                    className="h-7 text-xs"
+                  >
+                    <ArrowCounterClockwise size={14} className="mr-1" />
+                    Reset
+                  </Button>
+                </div>
+
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Blur: {adjustments.blur}px
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium">Blur</label>
+                    <span className="text-sm text-muted-foreground">{adjustments.blur}px</span>
+                  </div>
                   <Slider
                     value={[adjustments.blur]}
                     onValueChange={(v) => setAdjustments(prev => ({ ...prev, blur: v[0] }))}
@@ -538,9 +754,10 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Sharpness: {adjustments.sharpness}%
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium">Sharpness</label>
+                    <span className="text-sm text-muted-foreground">{adjustments.sharpness}%</span>
+                  </div>
                   <Slider
                     value={[adjustments.sharpness]}
                     onValueChange={(v) => setAdjustments(prev => ({ ...prev, sharpness: v[0] }))}
@@ -555,6 +772,9 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
             <TabsContent value="filters" className="mt-0 space-y-4">
               <Card className="p-6">
                 <h3 className="font-semibold mb-3">Filter Presets</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  One-click filters to transform your image instantly
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {filterPresets.map((filter) => (
                     <Button
@@ -562,13 +782,17 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                       variant={selectedFilter === filter.id ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => handleFilterSelect(filter.id)}
-                      className="justify-start gap-2"
+                      className="justify-start gap-2 h-auto py-2"
                     >
-                      {filter.isPro && subscriptionStatus.tier === 'free' && (
-                        <Crown size={14} weight="fill" className="text-primary" />
-                      )}
-                      {selectedFilter === filter.id && <Check size={14} weight="bold" />}
-                      {filter.name}
+                      <div className="flex flex-col items-start gap-0.5">
+                        <div className="flex items-center gap-1">
+                          {filter.isPro && subscriptionStatus.tier === 'free' && (
+                            <Crown size={12} weight="fill" className="text-primary" />
+                          )}
+                          {selectedFilter === filter.id && <Check size={12} weight="bold" />}
+                          <span className="text-xs font-medium">{filter.name}</span>
+                        </div>
+                      </div>
                     </Button>
                   ))}
                 </div>
@@ -581,6 +805,9 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                   <User weight="bold" />
                   Body & Face Editing
                 </h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  AI-powered tools for portrait and body enhancement
+                </p>
                 <div className="space-y-2">
                   {bodyEditModes.map((mode) => (
                     <Button
@@ -588,23 +815,24 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                       variant="outline"
                       size="sm"
                       onClick={() => handleBodyEdit(mode.id)}
-                      className="w-full justify-start gap-2"
+                      className="w-full justify-start gap-2 h-auto py-3"
                       disabled={isProcessing}
                     >
                       {mode.isPro && subscriptionStatus.tier === 'free' && (
-                        <Crown size={14} weight="fill" className="text-primary" />
+                        <Crown size={14} weight="fill" className="text-primary shrink-0" />
                       )}
-                      <mode.icon size={16} weight="bold" />
+                      <mode.icon size={18} weight="bold" className="shrink-0" />
                       <div className="flex-1 text-left">
-                        <div className="font-medium">{mode.name}</div>
-                        <div className="text-xs text-muted-foreground">{mode.description}</div>
+                        <div className="font-medium text-sm">{mode.name}</div>
+                        <div className="text-xs text-muted-foreground font-normal">{mode.description}</div>
                       </div>
                     </Button>
                   ))}
                 </div>
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 space-y-3">
+                <h4 className="font-semibold text-sm">Background Removal</h4>
                 <Button
                   onClick={handleRemoveBackground}
                   disabled={isProcessing}
@@ -615,11 +843,11 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                     <Crown size={16} weight="fill" className="text-primary" />
                   )}
                   <Scissors weight="bold" />
-                  Remove Background
+                  {isProcessing ? 'Processing...' : 'Remove Background'}
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  AI-powered background removal
-                  {subscriptionStatus.tier === 'free' && ' (Pro feature)'}
+                <p className="text-xs text-muted-foreground">
+                  AI-powered background removal with edge detection
+                  {subscriptionStatus.tier === 'free' && ' (Requires Pro)'}
                 </p>
               </Card>
             </TabsContent>
@@ -632,7 +860,12 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                     <Button
                       variant={tool === 'erase' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setTool(tool === 'erase' ? null : 'erase')}
+                      onClick={() => {
+                        setTool(tool === 'erase' ? null : 'erase')
+                        if (tool !== 'erase') {
+                          toast.info('Click and drag to erase parts of the image')
+                        }
+                      }}
                       className="w-full justify-start gap-2"
                     >
                       <Eraser size={16} weight="bold" />
@@ -642,14 +875,36 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                     <Button
                       variant={tool === 'clone' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setTool(tool === 'clone' ? null : 'clone')}
+                      onClick={() => {
+                        const newTool = tool === 'clone' ? null : 'clone'
+                        setTool(newTool)
+                        setCloneSrc(null)
+                        if (newTool === 'clone') {
+                          toast.info('Hold Shift + Click to set source, then click to paint')
+                        }
+                      }}
                       className="w-full justify-start gap-2"
                     >
                       <Copy size={16} weight="bold" />
-                      Clone Tool
+                      Clone Stamp Tool
                       {tool === 'clone' && <Badge className="ml-auto">Active</Badge>}
                     </Button>
                   </div>
+                  {tool && (
+                    <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <p className="text-xs font-medium text-primary mb-1">
+                        {tool === 'erase' ? '🖌️ Eraser Active' : '🎨 Clone Stamp Active'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {tool === 'erase' 
+                          ? 'Click and drag on the image to erase'
+                          : cloneSrc 
+                            ? 'Source set! Click to paint cloned pixels' 
+                            : 'Hold Shift + Click to set clone source'
+                        }
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
@@ -660,20 +915,44 @@ export function PhotoEditor({ subscriptionStatus, onUpgradeClick }: PhotoEditorP
                   </label>
                   <Slider
                     value={[brushSize]}
-                    onValueChange={(v) => setBrushSize(v[0])}
+                    onValueChange={(v) => {
+                      setBrushSize(v[0])
+                      if (cursorPos) {
+                        drawCursor(cursorPos.x, cursorPos.y)
+                      }
+                    }}
                     min={10}
                     max={150}
                     step={5}
                   />
-                </div>
-
-                {tool === 'clone' && (
-                  <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
-                    <p className="font-medium mb-1">Clone Tool Instructions:</p>
-                    <p>1. Hold Shift + Click to set clone source</p>
-                    <p>2. Click or drag to paint cloned area</p>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
+                    <span>Small</span>
+                    <div className="flex items-center gap-2">
+                      <span>Preview:</span>
+                      <div 
+                        className="rounded-full border-2 border-primary bg-primary/20"
+                        style={{ 
+                          width: `${Math.min(brushSize / 2, 30)}px`, 
+                          height: `${Math.min(brushSize / 2, 30)}px` 
+                        }}
+                      />
+                    </div>
+                    <span>Large</span>
                   </div>
-                )}
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-muted/50 border-dashed">
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <Lightbulb size={16} weight="fill" className="text-primary" />
+                  Quick Tips
+                </h4>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>• Use larger brushes for broad changes</li>
+                  <li>• Use smaller brushes for detailed work</li>
+                  <li>• Clone tool copies pixels from one area to another</li>
+                  <li>• Eraser removes pixels to transparency</li>
+                </ul>
               </Card>
             </TabsContent>
           </div>
