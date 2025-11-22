@@ -20,6 +20,7 @@ import { LandingPage } from '@/components/LandingPage'
 import { StripeConfigDialog } from '@/components/StripeConfigDialog'
 import { StripeCheckout } from '@/components/StripeCheckout'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
+import { CEODashboard } from '@/components/CEODashboard'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -105,6 +106,8 @@ function App() {
   const [stripeConfigOpen, setStripeConfigOpen] = useState(false)
   const [stripeCheckoutOpen, setStripeCheckoutOpen] = useState(false)
   const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
+  const [isCEOMode, setIsCEOMode] = useState(false)
+  const [keyBuffer, setKeyBuffer] = useState('')
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -116,6 +119,31 @@ function App() {
 
   useEffect(() => {
     setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
+  }, [])
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+        return
+      }
+
+      setKeyBuffer(prev => {
+        const newBuffer = (prev + e.key).slice(-20)
+        
+        if (newBuffer.includes('adminadmin19780111')) {
+          setIsCEOMode(true)
+          toast.success('CEO Dashboard Activated', {
+            description: 'Welcome to executive view'
+          })
+          return ''
+        }
+        
+        return newBuffer
+      })
+    }
+
+    window.addEventListener('keypress', handleKeyPress)
+    return () => window.removeEventListener('keypress', handleKeyPress)
   }, [])
 
   useEffect(() => {
@@ -138,6 +166,10 @@ function App() {
 
   if (!authState?.isAuthenticated || !authState.user) {
     return <LandingPage onAuthenticate={handleAuthenticate} />
+  }
+
+  if (isCEOMode) {
+    return <CEODashboard onSignOut={() => setIsCEOMode(false)} />
   }
 
   const applyAdjustmentsToCanvas = () => {
