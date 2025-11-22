@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -18,6 +18,9 @@ import { APIKeyManager } from '@/components/APIKeyManager'
 import { APIKeyBanner } from '@/components/APIKeyBanner'
 import { LandingPage } from '@/components/LandingPage'
 import { CEODashboard } from '@/components/CEODashboard'
+import { StripeConfigDialog } from '@/components/StripeConfigDialog'
+import { StripeCheckout } from '@/components/StripeCheckout'
+import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -28,6 +31,7 @@ import {
 } from '@/lib/subscription'
 import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
 import { initializeAuth, type User, type AuthState } from '@/lib/auth'
+import { getStoredStripeConfig, simulateSuccessfulPayment } from '@/lib/stripe'
 
 type MediaType = 'image' | 'video'
 
@@ -99,12 +103,17 @@ function App() {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeReason, setUpgradeReason] = useState<'limit_reached' | 'video_locked' | 'upgrade_prompt'>('upgrade_prompt')
   const [apiKeyManagerOpen, setApiKeyManagerOpen] = useState(false)
+  const [stripeConfigOpen, setStripeConfigOpen] = useState(false)
+  const [stripeCheckoutOpen, setStripeCheckoutOpen] = useState(false)
+  const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
   const hasConfiguredKeys = hasAnyProvider(apiKeys ?? {})
+  const stripeConfig = getStoredStripeConfig()
+  const hasStripeConfigured = !!stripeConfig
 
   useEffect(() => {
     setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
@@ -414,13 +423,39 @@ function App() {
   }
 
   const handleUpgrade = () => {
+    setUpgradeModalOpen(false)
+    if (hasStripeConfigured) {
+      setStripeCheckoutOpen(true)
+    } else {
+      setStripeConfigOpen(true)
+    }
+  }
+
+  const handleStripeConfigured = () => {
+    setStripeCheckoutOpen(true)
+  }
+
+  const handlePaymentSuccess = () => {
+    const userId = authState?.user?.id || 'default-user'
+    const stripeSubscription = simulateSuccessfulPayment('session_id', userId)
+    
     setSubscriptionStatus(current => ({
       ...(current ?? initializeSubscription()),
       tier: 'pro',
-      generationsLimit: null
+      generationsLimit: null,
+      stripeCustomerId: userId,
+      stripeSubscriptionId: stripeSubscription.id,
+      stripeStatus: stripeSubscription.status,
+      currentPeriodEnd: stripeSubscription.currentPeriodEnd,
+      cancelAtPeriodEnd: false
     }))
-    setUpgradeModalOpen(false)
-    toast.success('🎉 Welcome to Pro! Enjoy unlimited access.')
+  }
+
+  const handleSubscriptionCanceled = () => {
+    setSubscriptionStatus(current => ({
+      ...(current ?? initializeSubscription()),
+      cancelAtPeriodEnd: true
+    }))
   }
 
   const handleModeChange = (newMode: string) => {
@@ -469,6 +504,31 @@ function App() {
                   </span>
                 )}
               </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setStripeConfigOpen(true)}
+                className="relative"
+                title="Stripe Settings"
+              >
+                <CreditCard weight="fill" size={20} />
+                {hasStripeConfigured && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                  </span>
+                )}
+              </Button>
+              {currentStatus.tier === 'pro' && (
+                <Button
+                  variant="outline"
+                  onClick={() => setSubscriptionManagementOpen(true)}
+                  className="gap-2"
+                  title="Manage Subscription"
+                >
+                  <Crown weight="fill" size={20} />
+                  Manage Pro
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="icon"
@@ -1097,8 +1157,34 @@ function App() {
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
         onUpgrade={handleUpgrade}
+        onCheckoutClick={handleUpgrade}
         subscriptionStatus={currentStatus}
         reason={upgradeReason}
+      />
+
+      <StripeConfigDialog
+        open={stripeConfigOpen}
+        onOpenChange={setStripeConfigOpen}
+        onConfigured={handleStripeConfigured}
+      />
+
+      <StripeCheckout
+        open={stripeCheckoutOpen}
+        onOpenChange={setStripeCheckoutOpen}
+        userEmail={authState?.user?.email || ''}
+        onSuccess={handlePaymentSuccess}
+        onConfigureStripe={() => {
+          setStripeCheckoutOpen(false)
+          setStripeConfigOpen(true)
+        }}
+      />
+
+      <SubscriptionManagement
+        open={subscriptionManagementOpen}
+        onOpenChange={setSubscriptionManagementOpen}
+        subscriptionStatus={currentStatus}
+        userId={authState?.user?.id || 'default-user'}
+        onCanceled={handleSubscriptionCanceled}
       />
 
       <APIKeyManager

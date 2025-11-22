@@ -5,6 +5,11 @@ export interface SubscriptionStatus {
   generationsUsed: number
   generationsLimit: number | null
   resetDate: number
+  stripeCustomerId?: string
+  stripeSubscriptionId?: string
+  stripeStatus?: 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete'
+  currentPeriodEnd?: number
+  cancelAtPeriodEnd?: boolean
 }
 
 export const SUBSCRIPTION_LIMITS = {

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Crown, Lightning, Check, Sparkle, VideoCamera, Image as ImageIcon, ChatCircleDots } from '@phosphor-icons/react'
+import { Crown, Lightning, Check, Sparkle, VideoCamera, Image as ImageIcon, ChatCircleDots, CreditCard } from '@phosphor-icons/react'
 import type { SubscriptionStatus } from '@/lib/subscription'
 import { getUsagePercentage, getRemainingGenerations } from '@/lib/subscription'
 
@@ -11,6 +11,7 @@ interface SubscriptionModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpgrade: () => void
+  onCheckoutClick: () => void
   subscriptionStatus: SubscriptionStatus
   reason?: 'limit_reached' | 'video_locked' | 'upgrade_prompt'
 }
@@ -27,7 +28,8 @@ const PRO_FEATURES = [
 export function SubscriptionModal({ 
   open, 
   onOpenChange, 
-  onUpgrade, 
+  onUpgrade,
+  onCheckoutClick, 
   subscriptionStatus,
   reason = 'upgrade_prompt'
 }: SubscriptionModalProps) {
@@ -157,10 +159,10 @@ export function SubscriptionModal({
             </Button>
             <Button
               className="flex-1 gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
-              onClick={onUpgrade}
+              onClick={onCheckoutClick}
             >
-              <Crown weight="fill" />
-              Upgrade to Pro
+              <CreditCard weight="fill" />
+              Continue to Checkout
             </Button>
           </div>
 
