@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card } from '@/components/ui/card'
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
 type MediaType = 'image' | 'video'
@@ -26,8 +26,52 @@ function App() {
   const [gallery, setGallery] = useKV<MediaItem[]>('ai-creator-gallery', [])
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [referenceImage, setReferenceImage] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
+
+  const handleImageUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setReferenceImage(e.target?.result as string)
+      toast.success('Reference image added')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleImageUpload(file)
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile()
+        if (file) handleImageUpload(file)
+        break
+      }
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleImageUpload(file)
+  }
+
+  const removeReferenceImage = () => {
+    setReferenceImage(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    toast.success('Reference image removed')
+  }
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -114,6 +158,7 @@ function App() {
                       placeholder="A serene mountain landscape at sunset, with vibrant orange and purple skies..."
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
+                      onPaste={handlePaste}
                       rows={6}
                       className="resize-none"
                       disabled={isGenerating}
@@ -122,24 +167,57 @@ function App() {
                       {prompt.length} characters
                     </p>
                   </div>
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !prompt.trim()}
-                    className="w-full gap-2"
-                    size="lg"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <div className="animate-spin">⟳</div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkle weight="fill" />
-                        Generate Image
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !prompt.trim()}
+                      className="flex-1 gap-2"
+                      size="lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <div className="animate-spin">⟳</div>
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkle weight="fill" />
+                          Generate Image
+                        </>
+                      )}
+                    </Button>
+                    <div
+                      className="relative w-14 h-11 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
+                      onDrop={handleDrop}
+                      onDragOver={(e) => e.preventDefault()}
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Drop or paste reference image"
+                    >
+                      {referenceImage ? (
+                        <>
+                          <img src={referenceImage} alt="Reference" className="w-full h-full object-cover rounded-md" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeReferenceImage()
+                            }}
+                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:scale-110 transition-transform"
+                          >
+                            <X size={12} weight="bold" />
+                          </button>
+                        </>
+                      ) : (
+                        <Upload size={20} className="text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                 </TabsContent>
 
                 <TabsContent value="video" className="mt-0 space-y-4">
@@ -151,6 +229,7 @@ function App() {
                       placeholder="A time-lapse of a bustling city street transitioning from day to night..."
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
+                      onPaste={handlePaste}
                       rows={6}
                       className="resize-none"
                       disabled={isGenerating}
@@ -159,24 +238,57 @@ function App() {
                       {prompt.length} characters
                     </p>
                   </div>
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !prompt.trim()}
-                    className="w-full gap-2 bg-accent hover:bg-accent/90"
-                    size="lg"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <div className="animate-spin">⟳</div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkle weight="fill" />
-                        Generate Video
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !prompt.trim()}
+                      className="flex-1 gap-2 bg-accent hover:bg-accent/90"
+                      size="lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <div className="animate-spin">⟳</div>
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkle weight="fill" />
+                          Generate Video
+                        </>
+                      )}
+                    </Button>
+                    <div
+                      className="relative w-14 h-11 border-2 border-dashed border-border rounded-lg hover:border-accent transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
+                      onDrop={handleDrop}
+                      onDragOver={(e) => e.preventDefault()}
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Drop or paste reference image"
+                    >
+                      {referenceImage ? (
+                        <>
+                          <img src={referenceImage} alt="Reference" className="w-full h-full object-cover rounded-md" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeReferenceImage()
+                            }}
+                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:scale-110 transition-transform"
+                          >
+                            <X size={12} weight="bold" />
+                          </button>
+                        </>
+                      ) : (
+                        <Upload size={20} className="text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                 </TabsContent>
               </Tabs>
             </Card>
