@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
 import { 
   Crown, 
   Key, 
@@ -24,13 +26,30 @@ import {
   Sparkle,
   CreditCard,
   Gear,
-  Wallet
+  Wallet,
+  ArrowsClockwise,
+  Warning,
+  ListBullets
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { User } from '@/lib/auth'
 import type { APIKeys } from '@/lib/api-keys'
-import type { BankAccount } from '@/lib/bank'
-import { SUPPORTED_BANKS, createMockBankAccount, formatCurrency, formatAccountNumber } from '@/lib/bank'
+import { PlaidLinkButton } from '@/components/PlaidLink'
+import { 
+  PlaidConnection, 
+  PlaidConfig, 
+  DEFAULT_PLAID_CONFIG,
+  createLinkToken,
+  exchangePublicToken,
+  getAccounts,
+  getInstitution,
+  getTransactions,
+  formatPlaidBalance,
+  getTotalBalance,
+  refreshConnection,
+  removePlaidConnection,
+  PlaidTransaction
+} from '@/lib/plaid'
 
 interface CEODashboardProps {
   user: User
@@ -40,13 +59,20 @@ interface CEODashboardProps {
 export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'api-keys' | 'banking'>('overview')
   const [apiKeys, setApiKeys] = useKV<APIKeys>('ceo-api-keys', {})
-  const [bankAccounts, setBankAccounts] = useKV<BankAccount[]>('ceo-bank-accounts', [])
+  const [plaidConnections, setPlaidConnections] = useKV<PlaidConnection[]>('plaid-connections', [])
+  const [plaidConfig, setPlaidConfig] = useKV<PlaidConfig>('plaid-config', DEFAULT_PLAID_CONFIG)
+  const [linkToken, setLinkToken] = useState<string | null>(null)
   const [showKeyDialog, setShowKeyDialog] = useState(false)
   const [showBankDialog, setShowBankDialog] = useState(false)
+  const [showPlaidConfigDialog, setShowPlaidConfigDialog] = useState(false)
+  const [showTransactionsDialog, setShowTransactionsDialog] = useState(false)
+  const [selectedConnection, setSelectedConnection] = useState<PlaidConnection | null>(null)
+  const [transactions, setTransactions] = useState<PlaidTransaction[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>('')
-  const [selectedBank, setSelectedBank] = useState<string>('')
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [isRefreshing, setIsRefreshing] = useState<string | null>(null)
+  const [isLoadingLinkToken, setIsLoadingLinkToken] = useState(false)
 
   const API_PROVIDERS = [
     { id: 'openai', name: 'OpenAI', description: 'GPT-4, DALL-E', icon: '🤖' },
@@ -56,6 +82,115 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
     { id: 'runway', name: 'RunwayML', description: 'Video Generation', icon: '🎬' },
     { id: 'elevenlabs', name: 'ElevenLabs', description: 'Voice AI', icon: '🎤' },
   ]
+
+  useEffect(() => {
+    if (showBankDialog && !linkToken && !isLoadingLinkToken) {
+      handleGenerateLinkToken()
+    }
+  }, [showBankDialog])
+
+  const handleGenerateLinkToken = async () => {
+    setIsLoadingLinkToken(true)
+    try {
+      const tokenData = await createLinkToken(user.id, plaidConfig ?? DEFAULT_PLAID_CONFIG)
+      setLinkToken(tokenData.linkToken)
+      toast.success('Ready to connect bank')
+    } catch (error) {
+      toast.error('Failed to initialize bank connection')
+      console.error(error)
+    } finally {
+      setIsLoadingLinkToken(false)
+    }
+  }
+
+  const handlePlaidSuccess = async (publicToken: string, metadata: any) => {
+    try {
+      toast.success('Exchanging tokens...')
+      
+      const { accessToken, itemId } = await exchangePublicToken(publicToken, plaidConfig ?? DEFAULT_PLAID_CONFIG)
+      
+      const accounts = await getAccounts(accessToken, plaidConfig ?? DEFAULT_PLAID_CONFIG)
+      const institution = await getInstitution(metadata.institution?.institution_id || 'ins_3', plaidConfig ?? DEFAULT_PLAID_CONFIG)
+
+      const newConnection: PlaidConnection = {
+        id: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        accessToken,
+        itemId,
+        institution,
+        accounts,
+        connectedAt: Date.now(),
+        lastSynced: Date.now(),
+        isActive: true
+      }
+
+      setPlaidConnections(current => [...(current ?? []), newConnection])
+      
+      setShowBankDialog(false)
+      setLinkToken(null)
+      
+      toast.success(`Connected to ${institution.name}!`)
+    } catch (error) {
+      toast.error('Failed to complete bank connection')
+      console.error(error)
+    }
+  }
+
+  const handlePlaidExit = (error: any, metadata: any) => {
+    if (error) {
+      console.error('Plaid exit error:', error)
+    }
+    setShowBankDialog(false)
+    setLinkToken(null)
+  }
+
+  const handleRefreshConnection = async (connection: PlaidConnection) => {
+    setIsRefreshing(connection.id)
+    try {
+      const refreshed = await refreshConnection(connection, plaidConfig ?? DEFAULT_PLAID_CONFIG)
+      setPlaidConnections(current =>
+        (current ?? []).map(conn => conn.id === connection.id ? refreshed : conn)
+      )
+      toast.success('Account balances updated')
+    } catch (error) {
+      toast.error('Failed to refresh account data')
+      console.error(error)
+    } finally {
+      setIsRefreshing(null)
+    }
+  }
+
+  const handleDisconnectBank = async (connection: PlaidConnection) => {
+    try {
+      await removePlaidConnection(connection.itemId, plaidConfig ?? DEFAULT_PLAID_CONFIG)
+      setPlaidConnections(current => (current ?? []).filter(conn => conn.id !== connection.id))
+      toast.success(`Disconnected from ${connection.institution.name}`)
+    } catch (error) {
+      toast.error('Failed to disconnect account')
+      console.error(error)
+    }
+  }
+
+  const handleViewTransactions = async (connection: PlaidConnection) => {
+    setSelectedConnection(connection)
+    setShowTransactionsDialog(true)
+    
+    try {
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - 30)
+      
+      const txns = await getTransactions(
+        connection.accessToken,
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0],
+        plaidConfig ?? DEFAULT_PLAID_CONFIG
+      )
+      setTransactions(txns)
+    } catch (error) {
+      toast.error('Failed to load transactions')
+      console.error(error)
+    }
+  }
 
   const handleAddApiKey = () => {
     if (!selectedProvider || !apiKeyInput.trim()) {
@@ -83,25 +218,6 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
     toast.success('API key removed')
   }
 
-  const handleConnectBank = () => {
-    if (!selectedBank) {
-      toast.error('Please select a bank')
-      return
-    }
-
-    const newAccount = createMockBankAccount(selectedBank)
-    setBankAccounts(current => [...(current ?? []), newAccount])
-    
-    toast.success(`Connected to ${SUPPORTED_BANKS.find(b => b.id === selectedBank)?.name}`)
-    setShowBankDialog(false)
-    setSelectedBank('')
-  }
-
-  const handleDisconnectBank = (accountId: string) => {
-    setBankAccounts(current => (current ?? []).filter(acc => acc.id !== accountId))
-    toast.success('Bank account disconnected')
-  }
-
   const toggleKeyVisibility = (provider: string) => {
     setShowKeys(current => ({
       ...current,
@@ -115,9 +231,10 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
     return `${key.substring(0, 4)}${'•'.repeat(key.length - 8)}${key.substring(key.length - 4)}`
   }
 
-  const totalBalance = (bankAccounts ?? []).reduce((sum, acc) => sum + acc.balance, 0)
+  const totalBalance = getTotalBalance(plaidConnections ?? [])
   const connectedProviders = Object.keys(apiKeys ?? {}).length
-  const connectedBanks = (bankAccounts ?? []).length
+  const connectedBanks = (plaidConnections ?? []).length
+  const totalAccounts = (plaidConnections ?? []).reduce((sum, conn) => sum + conn.accounts.length, 0)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -173,13 +290,13 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
 
               <Card className="border-accent/30">
                 <CardHeader className="pb-3">
-                  <CardDescription>Connected Banks</CardDescription>
+                  <CardDescription>Bank Connections</CardDescription>
                   <CardTitle className="text-3xl">{connectedBanks}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Bank weight="fill" size={16} />
-                    <span>Active Accounts</span>
+                    <span>{totalAccounts} Account{totalAccounts !== 1 ? 's' : ''}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -187,7 +304,7 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
               <Card className="border-secondary/30">
                 <CardHeader className="pb-3">
                   <CardDescription>Total Balance</CardDescription>
-                  <CardTitle className="text-3xl">{formatCurrency(totalBalance)}</CardTitle>
+                  <CardTitle className="text-3xl">{formatPlaidBalance(totalBalance)}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -237,7 +354,7 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
                     <span className="font-semibold">Connect Bank</span>
                   </div>
                   <p className="text-xs text-muted-foreground text-left">
-                    Link a business account
+                    Link via Plaid integration
                   </p>
                 </Button>
               </CardContent>
@@ -270,7 +387,7 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
                     <div className="flex items-start gap-3">
                       <Bank weight="fill" className="text-accent mt-1" size={20} />
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{connectedBanks} bank account{connectedBanks > 1 ? 's' : ''} connected</p>
+                        <p className="text-sm font-medium">{connectedBanks} bank connection{connectedBanks > 1 ? 's' : ''} via Plaid</p>
                         <p className="text-xs text-muted-foreground">Sync active</p>
                       </div>
                     </div>
@@ -371,51 +488,75 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
           <TabsContent value="banking" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">Bank Connections</h2>
-                <p className="text-sm text-muted-foreground">Manage your connected business accounts</p>
+                <h2 className="text-2xl font-bold">Plaid Bank Connections</h2>
+                <p className="text-sm text-muted-foreground">Secure bank account integration via Plaid</p>
               </div>
-              <Button onClick={() => setShowBankDialog(true)} className="gap-2 bg-accent hover:bg-accent/90">
-                <Plus weight="bold" />
-                Connect Bank
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setShowPlaidConfigDialog(true)}
+                  title="Plaid Settings"
+                >
+                  <Gear weight="fill" />
+                </Button>
+                <Button onClick={() => setShowBankDialog(true)} className="gap-2 bg-accent hover:bg-accent/90">
+                  <Plus weight="bold" />
+                  Connect Bank
+                </Button>
+              </div>
             </div>
+
+            <Card className="bg-accent/10 border-accent/30">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Bank weight="fill" />
+                  Plaid Integration
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  This dashboard uses Plaid for secure bank connections. Environment: <Badge variant="outline">{plaidConfig?.environment || 'sandbox'}</Badge>
+                </p>
+              </CardContent>
+            </Card>
 
             {connectedBanks === 0 ? (
               <Card className="p-12 text-center">
                 <Bank size={48} weight="thin" className="text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Banks Connected</h3>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Connect your first business account to get started
+                  Connect your first business account via Plaid
                 </p>
                 <Button onClick={() => setShowBankDialog(true)} className="gap-2 bg-accent hover:bg-accent/90">
                   <Plus weight="bold" />
-                  Connect Your First Bank
+                  Connect via Plaid
                 </Button>
               </Card>
             ) : (
               <>
                 <Card className="bg-gradient-to-br from-accent/10 to-primary/10 border-accent/30">
                   <CardHeader>
-                    <CardTitle className="text-3xl">{formatCurrency(totalBalance)}</CardTitle>
-                    <CardDescription>Total Balance Across All Accounts</CardDescription>
+                    <CardTitle className="text-3xl">{formatPlaidBalance(totalBalance)}</CardTitle>
+                    <CardDescription>Total Balance Across {totalAccounts} Account{totalAccounts !== 1 ? 's' : ''}</CardDescription>
                   </CardHeader>
                 </Card>
 
                 <div className="grid grid-cols-1 gap-4">
-                  {(bankAccounts ?? []).map((account) => (
-                    <Card key={account.id} className="border-accent/20">
+                  {(plaidConnections ?? []).map((connection) => (
+                    <Card key={connection.id} className="border-accent/20">
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
                             <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center text-2xl">
-                              {SUPPORTED_BANKS.find(b => b.name === account.bankName)?.logo || '🏦'}
+                              {connection.institution.logo || '🏦'}
                             </div>
                             <div>
-                              <CardTitle className="text-lg">{account.bankName}</CardTitle>
+                              <CardTitle className="text-lg">{connection.institution.name}</CardTitle>
                               <CardDescription className="flex items-center gap-2">
-                                <span className="capitalize">{account.accountType}</span>
+                                <span>{connection.accounts.length} account{connection.accounts.length !== 1 ? 's' : ''}</span>
                                 <span>•</span>
-                                <span>{formatAccountNumber(account.accountNumber)}</span>
+                                <span className="text-xs">Last synced: {new Date(connection.lastSynced).toLocaleTimeString()}</span>
                               </CardDescription>
                             </div>
                           </div>
@@ -427,28 +568,57 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                            <div>
-                              <p className="text-sm text-muted-foreground">Available Balance</p>
-                              <p className="text-2xl font-bold">{formatCurrency(account.balance)}</p>
-                            </div>
-                            <Wallet weight="fill" size={32} className="text-accent" />
+                          <div className="space-y-2">
+                            {connection.accounts.map((account) => (
+                              <div key={account.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                <div>
+                                  <p className="text-sm font-medium">{account.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {account.subtype} • •••• {account.mask}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-bold">{formatPlaidBalance(account.balances.current)}</p>
+                                  {account.balances.available !== null && account.balances.available !== account.balances.current && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Available: {formatPlaidBalance(account.balances.available)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                           
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Last synced: {new Date(account.lastSynced!).toLocaleString()}</span>
-                            <span>Connected: {new Date(account.connectedAt!).toLocaleDateString()}</span>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRefreshConnection(connection)}
+                              disabled={isRefreshing === connection.id}
+                              className="flex-1 gap-2"
+                            >
+                              <ArrowsClockwise weight="bold" className={isRefreshing === connection.id ? 'animate-spin' : ''} />
+                              {isRefreshing === connection.id ? 'Refreshing...' : 'Refresh'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewTransactions(connection)}
+                              className="flex-1 gap-2"
+                            >
+                              <ListBullets weight="bold" />
+                              Transactions
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDisconnectBank(connection)}
+                              className="gap-2"
+                            >
+                              <X weight="bold" />
+                              Disconnect
+                            </Button>
                           </div>
-
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDisconnectBank(account.id)}
-                            className="w-full gap-2"
-                          >
-                            <X weight="bold" />
-                            Disconnect Account
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -519,54 +689,185 @@ export function CEODashboard({ user, onSignOut }: CEODashboardProps) {
       </Dialog>
 
       <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bank weight="fill" />
-              Connect Bank Account
+              Connect Bank via Plaid
             </DialogTitle>
             <DialogDescription>
-              Link a business account for financial management
+              Securely link your business account using Plaid
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="bank">Bank</Label>
-              <Select value={selectedBank} onValueChange={setSelectedBank}>
-                <SelectTrigger id="bank">
-                  <SelectValue placeholder="Select your bank" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_BANKS.map((bank) => (
-                    <SelectItem key={bank.id} value={bank.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{bank.logo}</span>
-                        <span>{bank.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="bg-accent/10 p-4 rounded-lg border border-accent/30">
+              <div className="flex items-start gap-2">
+                <Bank weight="fill" className="text-accent mt-1 shrink-0" size={20} />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Plaid Secure Connection</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your banking credentials are encrypted and never stored on our servers. Plaid uses bank-level security to protect your information.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex justify-center py-4">
+              {isLoadingLinkToken ? (
+                <div className="text-center">
+                  <div className="animate-spin mb-2">
+                    <ArrowsClockwise size={32} weight="bold" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Initializing Plaid...</p>
+                </div>
+              ) : linkToken ? (
+                <PlaidLinkButton
+                  linkToken={linkToken}
+                  onSuccess={handlePlaidSuccess}
+                  onExit={handlePlaidExit}
+                  className="gap-2 bg-accent hover:bg-accent/90 h-12 px-8"
+                >
+                  <Bank weight="fill" size={20} />
+                  Launch Plaid Connection
+                </PlaidLinkButton>
+              ) : (
+                <Button
+                  onClick={handleGenerateLinkToken}
+                  className="gap-2 bg-accent hover:bg-accent/90 h-12 px-8"
+                >
+                  <Bank weight="fill" size={20} />
+                  Initialize Plaid
+                </Button>
+              )}
             </div>
 
             <div className="bg-muted/50 p-4 rounded-lg">
               <div className="flex items-start gap-2">
-                <Gear weight="fill" className="text-primary mt-1 shrink-0" size={16} />
+                <Gear weight="fill" className="text-muted-foreground mt-1 shrink-0" size={16} />
                 <p className="text-xs text-muted-foreground">
-                  This is a demo connection. In production, this would open a secure Plaid or similar integration flow.
+                  Environment: <Badge variant="outline" className="ml-1">{plaidConfig?.environment || 'sandbox'}</Badge>
+                  {plaidConfig?.environment === 'sandbox' && ' • Using demo mode for testing'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPlaidConfigDialog} onOpenChange={setShowPlaidConfigDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gear weight="fill" />
+              Plaid Configuration
+            </DialogTitle>
+            <DialogDescription>
+              Configure your Plaid integration settings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="environment">Environment</Label>
+              <Select 
+                value={plaidConfig?.environment || 'sandbox'} 
+                onValueChange={(value) => setPlaidConfig(current => ({ ...(current ?? DEFAULT_PLAID_CONFIG), environment: value as any }))}
+              >
+                <SelectTrigger id="environment">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sandbox">Sandbox (Demo)</SelectItem>
+                  <SelectItem value="development">Development</SelectItem>
+                  <SelectItem value="production">Production</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Sandbox mode uses test data for development
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="client-id">Plaid Client ID (Optional)</Label>
+              <Input
+                id="client-id"
+                type="text"
+                placeholder="Your Plaid Client ID"
+                value={plaidConfig?.clientId || ''}
+                onChange={(e) => setPlaidConfig(current => ({ ...(current ?? DEFAULT_PLAID_CONFIG), clientId: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="secret">Plaid Secret (Optional)</Label>
+              <Input
+                id="secret"
+                type="password"
+                placeholder="Your Plaid Secret"
+                value={plaidConfig?.secret || ''}
+                onChange={(e) => setPlaidConfig(current => ({ ...(current ?? DEFAULT_PLAID_CONFIG), secret: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                In production, manage secrets on the server side
+              </p>
+            </div>
+
+            <div className="bg-accent/10 p-4 rounded-lg border border-accent/30">
+              <div className="flex items-start gap-2">
+                <Warning weight="fill" className="text-accent mt-1 shrink-0" size={16} />
+                <p className="text-xs text-muted-foreground">
+                  For demo purposes, this uses simulated Plaid integration. In production, you'll need valid Plaid credentials from plaid.com
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowBankDialog(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={handleConnectBank} className="flex-1 gap-2 bg-accent hover:bg-accent/90">
-                <Plus weight="bold" />
-                Connect
-              </Button>
-            </div>
+            <Button onClick={() => setShowPlaidConfigDialog(false)} className="w-full">
+              Save Configuration
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTransactionsDialog} onOpenChange={setShowTransactionsDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListBullets weight="fill" />
+              Recent Transactions
+            </DialogTitle>
+            <DialogDescription>
+              {selectedConnection?.institution.name} • Last 30 days
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            {transactions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">Loading transactions...</p>
+              </div>
+            ) : (
+              transactions.map((txn) => (
+                <div key={txn.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{txn.name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{txn.date}</span>
+                      <span>•</span>
+                      <span>{txn.category.join(' > ')}</span>
+                      {txn.pending && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-[10px] h-4 px-1">Pending</Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-right">
+                    -{formatPlaidBalance(txn.amount)}
+                  </p>
+                </div>
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>
