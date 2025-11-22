@@ -26,7 +26,7 @@ function App() {
   const [gallery, setGallery] = useKV<MediaItem[]>('ai-creator-gallery', [])
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [referenceImage, setReferenceImage] = useState<string | null>(null)
+  const [referenceImages, setReferenceImages] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
@@ -37,9 +37,14 @@ function App() {
       return
     }
 
+    if (referenceImages.length >= 5) {
+      toast.error('Maximum 5 reference images allowed')
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (e) => {
-      setReferenceImage(e.target?.result as string)
+      setReferenceImages(prev => [...prev, e.target?.result as string])
       toast.success('Reference image added')
     }
     reader.readAsDataURL(file)
@@ -47,8 +52,19 @@ function App() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file) handleImageUpload(file)
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    
+    if (files.length === 0) {
+      toast.error('No valid image files found')
+      return
+    }
+
+    const availableSlots = 5 - referenceImages.length
+    if (files.length > availableSlots) {
+      toast.error(`Can only add ${availableSlots} more image(s)`)
+    }
+
+    files.slice(0, availableSlots).forEach(file => handleImageUpload(file))
   }
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -63,12 +79,21 @@ function App() {
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleImageUpload(file)
+    const files = e.target.files
+    if (!files) return
+
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+    const availableSlots = 5 - referenceImages.length
+    
+    if (imageFiles.length > availableSlots) {
+      toast.error(`Can only add ${availableSlots} more image(s)`)
+    }
+
+    imageFiles.slice(0, availableSlots).forEach(file => handleImageUpload(file))
   }
 
-  const removeReferenceImage = () => {
-    setReferenceImage(null)
+  const removeReferenceImage = (index: number) => {
+    setReferenceImages(prev => prev.filter((_, i) => i !== index))
     if (fileInputRef.current) fileInputRef.current.value = ''
     toast.success('Reference image removed')
   }
@@ -167,6 +192,54 @@ function App() {
                       {prompt.length} characters
                     </p>
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium">
+                        Reference Images {referenceImages.length > 0 && `(${referenceImages.length}/5)`}
+                      </label>
+                      {referenceImages.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setReferenceImages([])
+                            if (fileInputRef.current) fileInputRef.current.value = ''
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {referenceImages.map((img, index) => (
+                        <div
+                          key={index}
+                          className="relative w-20 h-20 border-2 border-border rounded-lg overflow-hidden group"
+                        >
+                          <img src={img} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeReferenceImage(index)
+                            }}
+                            className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+                          >
+                            <X size={12} weight="bold" />
+                          </button>
+                        </div>
+                      ))}
+                      {referenceImages.length < 5 && (
+                        <div
+                          className="w-20 h-20 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
+                          onDrop={handleDrop}
+                          onDragOver={(e) => e.preventDefault()}
+                          onClick={() => fileInputRef.current?.click()}
+                          title="Add reference image"
+                        >
+                          <Upload size={24} className="text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleGenerate}
@@ -186,35 +259,12 @@ function App() {
                         </>
                       )}
                     </Button>
-                    <div
-                      className="relative w-14 h-11 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
-                      onDrop={handleDrop}
-                      onDragOver={(e) => e.preventDefault()}
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Drop or paste reference image"
-                    >
-                      {referenceImage ? (
-                        <>
-                          <img src={referenceImage} alt="Reference" className="w-full h-full object-cover rounded-md" />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeReferenceImage()
-                            }}
-                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:scale-110 transition-transform"
-                          >
-                            <X size={12} weight="bold" />
-                          </button>
-                        </>
-                      ) : (
-                        <Upload size={20} className="text-muted-foreground" />
-                      )}
-                    </div>
                   </div>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -238,6 +288,54 @@ function App() {
                       {prompt.length} characters
                     </p>
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium">
+                        Reference Images {referenceImages.length > 0 && `(${referenceImages.length}/5)`}
+                      </label>
+                      {referenceImages.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setReferenceImages([])
+                            if (fileInputRef.current) fileInputRef.current.value = ''
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {referenceImages.map((img, index) => (
+                        <div
+                          key={index}
+                          className="relative w-20 h-20 border-2 border-border rounded-lg overflow-hidden group"
+                        >
+                          <img src={img} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeReferenceImage(index)
+                            }}
+                            className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+                          >
+                            <X size={12} weight="bold" />
+                          </button>
+                        </div>
+                      ))}
+                      {referenceImages.length < 5 && (
+                        <div
+                          className="w-20 h-20 border-2 border-dashed border-border rounded-lg hover:border-accent transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
+                          onDrop={handleDrop}
+                          onDragOver={(e) => e.preventDefault()}
+                          onClick={() => fileInputRef.current?.click()}
+                          title="Add reference image"
+                        >
+                          <Upload size={24} className="text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleGenerate}
@@ -257,35 +355,12 @@ function App() {
                         </>
                       )}
                     </Button>
-                    <div
-                      className="relative w-14 h-11 border-2 border-dashed border-border rounded-lg hover:border-accent transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
-                      onDrop={handleDrop}
-                      onDragOver={(e) => e.preventDefault()}
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Drop or paste reference image"
-                    >
-                      {referenceImage ? (
-                        <>
-                          <img src={referenceImage} alt="Reference" className="w-full h-full object-cover rounded-md" />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeReferenceImage()
-                            }}
-                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:scale-110 transition-transform"
-                          >
-                            <X size={12} weight="bold" />
-                          </button>
-                        </>
-                      ) : (
-                        <Upload size={20} className="text-muted-foreground" />
-                      )}
-                    </div>
                   </div>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleFileSelect}
                     className="hidden"
                   />
