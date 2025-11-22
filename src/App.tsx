@@ -8,12 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
 import { UsageIndicator } from '@/components/UsageIndicator'
 import { PhotoEditor } from '@/components/PhotoEditor'
+import { APIKeyManager } from '@/components/APIKeyManager'
+import { APIKeyBanner } from '@/components/APIKeyBanner'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -22,6 +24,7 @@ import {
   SUBSCRIPTION_LIMITS,
   type SubscriptionStatus 
 } from '@/lib/subscription'
+import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
 
 type MediaType = 'image' | 'video'
 
@@ -87,14 +90,17 @@ function App() {
     'subscription-status',
     initializeSubscription()
   )
+  const [apiKeys] = useKV<APIKeys>('api-keys', {})
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeReason, setUpgradeReason] = useState<'limit_reached' | 'video_locked' | 'upgrade_prompt'>('upgrade_prompt')
+  const [apiKeyManagerOpen, setApiKeyManagerOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
+  const hasConfiguredKeys = hasAnyProvider(apiKeys ?? {})
 
   useEffect(() => {
     setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
@@ -284,6 +290,12 @@ function App() {
       return
     }
 
+    if (!hasConfiguredKeys) {
+      toast.error('Please configure API keys first')
+      setApiKeyManagerOpen(true)
+      return
+    }
+
     const currentStatus = subscriptionStatus ?? initializeSubscription()
 
     if (mode === 'video' && !SUBSCRIPTION_LIMITS[currentStatus.tier].features.videoGeneration) {
@@ -295,6 +307,13 @@ function App() {
     if (!canGenerate(currentStatus)) {
       setUpgradeReason('limit_reached')
       setUpgradeModalOpen(true)
+      return
+    }
+
+    const provider = getProviderForFeature(apiKeys ?? {}, mode)
+    if (!provider) {
+      toast.error(`No API provider configured for ${mode} generation`)
+      setApiKeyManagerOpen(true)
       return
     }
 
@@ -411,19 +430,35 @@ function App() {
                 </Badge>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setAssistantOpen(true)}
-              className="relative"
-              title="AI Assistant"
-            >
-              <ChatCircleDots weight="fill" size={20} />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-              </span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setApiKeyManagerOpen(true)}
+                className="relative"
+                title="API Keys"
+              >
+                <Key weight="fill" size={20} />
+                {hasConfiguredKeys && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setAssistantOpen(true)}
+                className="relative"
+                title="AI Assistant"
+              >
+                <ChatCircleDots weight="fill" size={20} />
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                </span>
+              </Button>
+            </div>
           </div>
           <p className="text-muted-foreground">Generate stunning images and videos with AI</p>
         </header>
@@ -444,6 +479,11 @@ function App() {
         {mainTab === 'generate' ? (
           <div className="grid lg:grid-cols-[400px_1fr] gap-8">
           <div className="space-y-6">
+            <APIKeyBanner 
+              hasAnyKey={hasConfiguredKeys}
+              onConfigureClick={() => setApiKeyManagerOpen(true)}
+            />
+
             <UsageIndicator 
               subscriptionStatus={currentStatus}
               onUpgradeClick={() => {
@@ -584,7 +624,7 @@ function App() {
                   <div className="flex gap-2">
                     <Button
                       onClick={handleGenerate}
-                      disabled={isGenerating || !prompt.trim()}
+                      disabled={isGenerating || !prompt.trim() || !hasConfiguredKeys}
                       className="flex-1 gap-2"
                       size="lg"
                     >
@@ -698,7 +738,7 @@ function App() {
                   <div className="flex gap-2">
                     <Button
                       onClick={handleGenerate}
-                      disabled={isGenerating || !prompt.trim()}
+                      disabled={isGenerating || !prompt.trim() || !hasConfiguredKeys}
                       className="flex-1 gap-2 bg-accent hover:bg-accent/90"
                       size="lg"
                     >
@@ -1026,6 +1066,11 @@ function App() {
         onUpgrade={handleUpgrade}
         subscriptionStatus={currentStatus}
         reason={upgradeReason}
+      />
+
+      <APIKeyManager
+        open={apiKeyManagerOpen}
+        onOpenChange={setApiKeyManagerOpen}
       />
     </div>
   )

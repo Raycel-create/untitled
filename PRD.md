@@ -12,11 +12,18 @@ An AI-powered creative studio that generates stunning images and videos from tex
 
 ## Essential Features
 
+### API Key Management
+- **Functionality**: Users configure their own AI provider API keys (OpenAI, Stability AI, Replicate, RunwayML)
+- **Purpose**: Enable users to bring their own API access while maintaining privacy and control
+- **Trigger**: User clicks API key icon in header or prompted when attempting generation without keys
+- **Progression**: Click API key icon → Modal opens showing providers → Add/edit key for provider → Validate format → Save securely → Keys stored in browser only → Use in generation requests
+- **Success criteria**: Keys stored securely in browser, masked in UI, format validation works, clear error messages
+
 ### Text-to-Image Generation
 - **Functionality**: User enters text prompt, optionally selects style preset and applies editing tools to reference images, AI generates corresponding image
 - **Purpose**: Enable quick visual ideation and artistic exploration with creative control
 - **Trigger**: User types prompt and clicks "Generate Image" button
-- **Progression**: Enter prompt → (Optional) Select style preset → (Optional) Edit reference images with tools → Click generate → Loading state with progress → Image reveals → Auto-saves to gallery → Option to regenerate or create new
+- **Progression**: Check API keys configured → Enter prompt → (Optional) Select style preset → (Optional) Edit reference images with tools → Click generate → Loading state with progress → Image reveals → Auto-saves to gallery → Option to regenerate or create new
 - **Success criteria**: Images appear within 10 seconds, full resolution, properly formatted
 
 ### Style Presets
@@ -84,6 +91,9 @@ An AI-powered creative studio that generates stunning images and videos from tex
 
 ## Edge Case Handling
 
+- **No API Keys Configured**: Banner displayed prominently, generation disabled with clear messaging, one-click access to key management
+- **Invalid API Keys**: Format validation on input, helpful error messages guide correction
+- **API Request Failures**: Detect provider errors vs network issues, show specific error messages, suggest checking API key validity
 - **Generation Failures**: Show clear error message with retry option, don't lose prompt text
 - **Long Prompts**: Support multi-line text areas with character count, reasonable limits
 - **Empty Prompts**: Disable generate button until valid text entered
@@ -143,14 +153,16 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Textarea for prompt input with character counter
   - Button for generate actions with loading states
   - Card for gallery items with hover effects
-  - Dialog for fullscreen media preview and image editing
+  - Dialog for fullscreen media preview, image editing, and API key management
   - Progress indicator during generation
-  - Badge for media type labels, style presets, and subscription tier
+  - Badge for media type labels, style presets, subscription tier, and key status
   - Separator for visual section breaks
   - Slider for image adjustment controls (brightness, contrast, blur)
   - Toggle buttons for image transformations (flip, rotate)
   - Sheet (sliding panel) for AI assistant chat interface
-  - Alert for usage limit warnings and upgrade prompts
+  - Alert for usage limit warnings, upgrade prompts, and API key notices
+  - Input for secure API key entry with show/hide toggle
+  - Label for form field identification
 - **Customizations**: 
   - Custom video player controls overlay
   - Gradient overlays on gallery thumbnails for text readability
@@ -175,6 +187,10 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Crown (Phosphor) for pro tier badge
   - Lightning (Phosphor) for upgrade prompts
   - Question (Phosphor) for help hints
+  - Key (Phosphor) for API key management
+  - Eye/EyeSlash (Phosphor) for show/hide API keys
+  - Check (Phosphor) for configured status
+  - Info (Phosphor) for informational alerts
 - **Spacing**: 
   - Container: max-w-7xl mx-auto with px-4 sm:px-6 lg:px-8
   - Sections: gap-8 between major sections
