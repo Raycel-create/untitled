@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -16,6 +16,8 @@ import { UsageIndicator } from '@/components/UsageIndicator'
 import { PhotoEditor } from '@/components/PhotoEditor'
 import { APIKeyManager } from '@/components/APIKeyManager'
 import { APIKeyBanner } from '@/components/APIKeyBanner'
+import { LandingPage } from '@/components/LandingPage'
+import { CEODashboard } from '@/components/CEODashboard'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -25,6 +27,7 @@ import {
   type SubscriptionStatus 
 } from '@/lib/subscription'
 import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
+import { initializeAuth, type User, type AuthState } from '@/lib/auth'
 
 type MediaType = 'image' | 'video'
 
@@ -69,6 +72,7 @@ const stylePresets: StylePreset[] = [
 ]
 
 function App() {
+  const [authState, setAuthState] = useKV<AuthState>('auth-state', initializeAuth())
   const [mainTab, setMainTab] = useState<'generate' | 'edit'>('generate')
   const [mode, setMode] = useState<MediaType>('image')
   const [prompt, setPrompt] = useState('')
@@ -111,6 +115,26 @@ function App() {
       applyAdjustmentsToCanvas()
     }
   }, [tempAdjustments, editingImageIndex])
+
+  const handleAuthenticate = (user: User) => {
+    setAuthState({
+      isAuthenticated: true,
+      user
+    })
+  }
+
+  const handleSignOut = () => {
+    setAuthState(initializeAuth())
+    toast.success('Signed out successfully')
+  }
+
+  if (!authState?.isAuthenticated || !authState.user) {
+    return <LandingPage onAuthenticate={handleAuthenticate} />
+  }
+
+  if (authState.user.role === 'ceo') {
+    return <CEODashboard user={authState.user} onSignOut={handleSignOut} />
+  }
 
   const applyAdjustmentsToCanvas = () => {
     if (editingImageIndex === null || !canvasRef.current) return
@@ -458,9 +482,18 @@ function App() {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
                 </span>
               </Button>
+              <Button
+                variant="outline"
+                onClick={handleSignOut}
+                className="gap-2"
+                title="Sign Out"
+              >
+                <SignOut weight="bold" size={20} />
+                Sign Out
+              </Button>
             </div>
           </div>
-          <p className="text-muted-foreground">Generate stunning images and videos with AI</p>
+          <p className="text-muted-foreground">Welcome back, {authState.user?.name}!</p>
         </header>
 
         <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as 'generate' | 'edit')} className="mb-6">

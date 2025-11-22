@@ -1,16 +1,51 @@
 # Planning Guide
 
-An AI-powered creative studio that generates stunning images and videos from text descriptions, enabling users to bring their visual ideas to life through simple prompts.
+An AI-powered creative studio with secure authentication that generates stunning images and videos from text descriptions, featuring a dedicated CEO dashboard for executive control over API integrations and financial connections.
 
 **Experience Qualities**: 
-1. **Inspiring** - Beautiful gallery showcasing AI's creative potential, encouraging experimentation
-2. **Effortless** - Clean prompt-to-creation flow with minimal clicks between idea and output
-3. **Delightful** - Smooth generation states and satisfying reveal animations that celebrate each creation
+1. **Secure** - Professional authentication system with role-based access and encrypted credentials
+2. **Inspiring** - Beautiful gallery showcasing AI's creative potential, encouraging experimentation
+3. **Powerful** - Executive tools for API management and bank integration alongside creative features
 
 **Complexity Level**: Light Application (multiple features with basic state)
-  - Dual-mode creation tool with persistent gallery, focusing on streamlined AI generation workflow with organized content management
+  - Multi-role application with authentication, dual-mode creation tool, persistent gallery, and executive dashboard for business management
 
 ## Essential Features
+
+### Authentication System
+- **Functionality**: User sign-in/sign-up with email/password, role-based access (user/ceo), demo accounts
+- **Purpose**: Secure access control and personalized experiences based on user role
+- **Trigger**: User opens app without existing session
+- **Progression**: Landing page loads → User enters credentials or clicks demo → Validation → Role detection → Redirect to appropriate interface
+- **Success criteria**: Secure password validation, session persistence, smooth role-based routing
+
+### CEO Dashboard
+- **Functionality**: Executive control panel with API key management, bank integrations, analytics overview
+- **Purpose**: Provide business leaders with operational control and financial visibility
+- **Trigger**: User with 'ceo' role signs in
+- **Progression**: Sign in as CEO → Dashboard loads → View metrics → Manage API keys → Connect banks → Monitor activity
+- **Success criteria**: All executive functions accessible, real-time updates, secure credential storage
+
+### CEO Dashboard
+- **Functionality**: Executive control panel with API key management, bank integrations, analytics overview
+- **Purpose**: Provide business leaders with operational control and financial visibility
+- **Trigger**: User with 'ceo' role signs in
+- **Progression**: Sign in as CEO → Dashboard loads → View metrics → Manage API keys → Connect banks → Monitor activity
+- **Success criteria**: All executive functions accessible, real-time updates, secure credential storage
+
+### Bank Integration
+- **Functionality**: Connect and manage multiple business bank accounts with balance tracking
+- **Purpose**: Financial oversight and account management for executives
+- **Trigger**: CEO clicks "Connect Bank" in dashboard
+- **Progression**: Click connect → Select bank → Authenticate (simulated) → Account linked → Balance syncs → Appears in dashboard
+- **Success criteria**: Multiple accounts supported, balances display correctly, secure storage
+
+### Executive API Management
+- **Functionality**: Configure API keys for multiple AI providers from centralized dashboard
+- **Purpose**: IT control over service integrations with visibility and security
+- **Trigger**: CEO navigates to API Keys tab
+- **Progression**: Select provider → Enter key → Validate → Store securely → Monitor status → Remove if needed
+- **Success criteria**: Support 6+ providers, masked display, secure storage, easy removal
 
 ### API Key Management
 - **Functionality**: Users configure their own AI provider API keys (OpenAI, Stability AI, Replicate, RunwayML)
@@ -91,6 +126,10 @@ An AI-powered creative studio that generates stunning images and videos from tex
 
 ## Edge Case Handling
 
+- **Unauthenticated Access**: Redirect to landing page, preserve no sensitive data
+- **Invalid Credentials**: Clear error messages, no account lockout on demo
+- **Role-Based Access**: CEO sees dashboard, regular users see creative studio
+- **Session Persistence**: Auth state survives refresh, sign out clears completely
 - **No API Keys Configured**: Banner displayed prominently, generation disabled with clear messaging, one-click access to key management
 - **Invalid API Keys**: Format validation on input, helpful error messages guide correction
 - **API Request Failures**: Detect provider errors vs network issues, show specific error messages, suggest checking API key validity
@@ -149,7 +188,9 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
 ## Component Selection
 
 - **Components**: 
-  - Tabs for mode switching (Image/Video)
+  - Tabs for mode switching (Image/Video) and dashboard navigation (Overview/API/Banking)
+  - Card for authentication forms, gallery items, dashboard metrics, bank accounts, API providers
+  - Input for email, password, name, API keys with secure masking
   - Textarea for prompt input with character counter
   - Button for generate actions with loading states
   - Card for gallery items with hover effects
@@ -177,6 +218,12 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Textarea: empty (placeholder) → typing → valid (ready to generate)
 - **Icon Selection**: 
   - Sparkles (Phosphor) for generate buttons (AI magic)
+  - Crown (Phosphor) for CEO role and pro tier badge
+  - Shield (Phosphor) for authentication/security
+  - SignOut (Phosphor) for logout actions
+  - Bank (Phosphor) for financial features
+  - Wallet (Phosphor) for balance display
+  - CreditCard (Phosphor) for payment features
   - Image (Phosphor) for image mode tab
   - Video (Phosphor) for video mode tab
   - Download (Phosphor) for save actions
