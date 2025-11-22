@@ -26,12 +26,12 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Progression**: Click CEO Mode → Admin login modal appears → Enter credentials → Authenticate → Dashboard loads → View metrics → Manage API keys → Connect banks → Monitor activity → Sign out to return to main app
 - **Success criteria**: Secure authentication with password protection, 8-hour session persistence, all executive functions accessible, real-time updates, secure credential storage
 
-### Admin Authentication
-- **Functionality**: Password-protected admin login system for CEO dashboard access with session management
-- **Purpose**: Secure executive features behind authentication, preventing unauthorized access to sensitive business controls
+### Multi-Factor Authentication (MFA)
+- **Functionality**: Two-step authentication system requiring username/password and time-based verification code for CEO dashboard access
+- **Purpose**: Enhanced security for executive features, preventing unauthorized access even if password is compromised
 - **Trigger**: User clicks "CEO Mode" button in main header
-- **Progression**: Click CEO Mode → Login dialog opens → Enter username and password → Validate credentials → Create 8-hour session → Grant access to CEO dashboard → Session persists across refreshes → Expires after 8 hours or manual logout
-- **Success criteria**: Credentials validated securely, sessions persist properly, clear error messages for failed attempts, smooth authentication flow
+- **Progression**: Click CEO Mode → Login dialog opens → Enter username and password → Validate credentials → Generate 6-digit MFA code (5-minute expiry) → Display code in toast/console → Enter code in InputOTP component → Validate code with attempt tracking (max 3 attempts) → Create 8-hour session with MFA flag → Grant access to CEO dashboard → Session persists across refreshes → Expires after 8 hours or manual logout
+- **Success criteria**: Credentials validated securely, MFA code generates properly, timer displays remaining time, attempt tracking works, sessions persist with MFA verification flag, clear error messages for failed attempts at each step, smooth two-step authentication flow
 
 ### Bank Integration
 - **Functionality**: Connect and manage multiple business bank accounts with balance tracking
@@ -130,9 +130,12 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Invalid Credentials**: Clear error messages, no account lockout on demo
 - **Role-Based Access**: CEO sees dashboard, regular users see creative studio
 - **Session Persistence**: Auth state survives refresh, sign out clears completely
-- **Admin Authentication Failures**: Clear error messaging for incorrect credentials, no account lockout, credential input cleared after failed attempt
-- **Expired Admin Sessions**: Auto-logout after 8 hours, redirect to main app, require re-authentication for CEO access
-- **CEO Mode Access Attempts**: Button always visible, authentication dialog prevents unauthorized access
+- **Admin Authentication Failures**: Clear error messaging for incorrect credentials at both password and MFA stages, no account lockout, credential input cleared after failed attempt
+- **Expired Admin Sessions**: Auto-logout after 8 hours, redirect to main app, require re-authentication (both password and MFA) for CEO access
+- **Expired MFA Codes**: 5-minute expiry with countdown timer, automatic reset flow when expired, option to resend new code
+- **MFA Attempt Limits**: Max 3 attempts per code, automatic reset flow after exceeded attempts, new code generation on resend
+- **MFA Code Display**: Code shown in toast notification and console log for demo purposes, production would send via email/SMS
+- **CEO Mode Access Attempts**: Button always visible, two-step authentication dialog prevents unauthorized access
 - **No API Keys Configured**: Banner displayed prominently, generation disabled with clear messaging, one-click access to key management
 - **Invalid API Keys**: Format validation on input, helpful error messages guide correction
 - **API Request Failures**: Detect provider errors vs network issues, show specific error messages, suggest checking API key validity
@@ -197,14 +200,15 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Textarea for prompt input with character counter
   - Button for generate actions with loading states
   - Card for gallery items with hover effects
-  - Dialog for fullscreen media preview, image editing, and API key management
+  - Dialog for fullscreen media preview, image editing, two-step MFA authentication, and API key management
+  - InputOTP for secure 6-digit MFA code entry with visual feedback
   - Progress indicator during generation
   - Badge for media type labels, style presets, subscription tier, and key status
   - Separator for visual section breaks
   - Slider for image adjustment controls (brightness, contrast, blur)
   - Toggle buttons for image transformations (flip, rotate)
   - Sheet (sliding panel) for AI assistant chat interface
-  - Alert for usage limit warnings, upgrade prompts, and API key notices
+  - Alert for MFA timer display, usage limit warnings, upgrade prompts, and API key notices
   - Input for secure API key entry with show/hide toggle
   - Label for form field identification
 - **Customizations**: 
@@ -223,7 +227,10 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Sparkles (Phosphor) for generate buttons (AI magic)
   - Crown (Phosphor) for CEO role and pro tier badge
   - Shield (Phosphor) for authentication/security
+  - ShieldCheck (Phosphor) for MFA verification
   - Lock (Phosphor) for admin authentication
+  - Timer (Phosphor) for MFA code countdown
+  - ArrowLeft (Phosphor) for navigation back to credentials step
   - SignIn (Phosphor) for login actions
   - SignOut (Phosphor) for logout actions
   - Bank (Phosphor) for financial features
