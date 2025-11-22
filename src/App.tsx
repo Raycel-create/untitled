@@ -8,11 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
 import { UsageIndicator } from '@/components/UsageIndicator'
+import { PhotoEditor } from '@/components/PhotoEditor'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -65,6 +66,7 @@ const stylePresets: StylePreset[] = [
 ]
 
 function App() {
+  const [mainTab, setMainTab] = useState<'generate' | 'edit'>('generate')
   const [mode, setMode] = useState<MediaType>('image')
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -426,7 +428,21 @@ function App() {
           <p className="text-muted-foreground">Generate stunning images and videos with AI</p>
         </header>
 
-        <div className="grid lg:grid-cols-[400px_1fr] gap-8">
+        <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as 'generate' | 'edit')} className="mb-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="generate" className="gap-2">
+              <Sparkle weight="fill" size={16} />
+              AI Generate
+            </TabsTrigger>
+            <TabsTrigger value="edit" className="gap-2">
+              <Scissors weight="fill" size={16} />
+              Photo Editor
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {mainTab === 'generate' ? (
+          <div className="grid lg:grid-cols-[400px_1fr] gap-8">
           <div className="space-y-6">
             <UsageIndicator 
               subscriptionStatus={currentStatus}
@@ -791,6 +807,15 @@ function App() {
             )}
           </div>
         </div>
+        ) : (
+          <PhotoEditor 
+            subscriptionStatus={currentStatus}
+            onUpgradeClick={() => {
+              setUpgradeReason('upgrade_prompt')
+              setUpgradeModalOpen(true)
+            }}
+          />
+        )}
       </div>
 
       <Dialog open={!!selectedMedia} onOpenChange={() => setSelectedMedia(null)}>

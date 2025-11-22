@@ -19,6 +19,9 @@ export const SUBSCRIPTION_LIMITS = {
       aiAssistant: true,
       prioritySupport: false,
       hdQuality: false,
+      backgroundRemoval: false,
+      advancedBodyEditing: false,
+      proFilters: false,
     }
   },
   pro: {
@@ -32,6 +35,9 @@ export const SUBSCRIPTION_LIMITS = {
       aiAssistant: true,
       prioritySupport: true,
       hdQuality: true,
+      backgroundRemoval: true,
+      advancedBodyEditing: true,
+      proFilters: true,
     }
   }
 }
