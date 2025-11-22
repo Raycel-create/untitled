@@ -106,7 +106,7 @@ function App() {
   const [stripeConfigOpen, setStripeConfigOpen] = useState(false)
   const [stripeCheckoutOpen, setStripeCheckoutOpen] = useState(false)
   const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
-  const [isCEOMode, setIsCEOMode] = useState(false)
+  const [isCEOMode, setIsCEOMode] = useKV<boolean>('ceo-mode-enabled', false)
   const [keyBuffer, setKeyBuffer] = useState('')
   
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -131,9 +131,13 @@ function App() {
         const newBuffer = (prev + e.key).slice(-20)
         
         if (newBuffer.includes('adminadmin19780111')) {
-          setIsCEOMode(true)
-          toast.success('CEO Dashboard Activated', {
-            description: 'Welcome to executive view'
+          setIsCEOMode((current) => {
+            if (!current) {
+              toast.success('CEO Dashboard Activated', {
+                description: 'Welcome to executive view'
+              })
+            }
+            return true
           })
           return ''
         }
@@ -169,7 +173,12 @@ function App() {
   }
 
   if (isCEOMode) {
-    return <CEODashboard onSignOut={() => setIsCEOMode(false)} />
+    return <CEODashboard onSignOut={() => {
+      setIsCEOMode(false)
+      toast.success('CEO Dashboard Deactivated', {
+        description: 'Returned to standard view'
+      })
+    }} />
   }
 
   const applyAdjustmentsToCanvas = () => {
@@ -556,6 +565,23 @@ function App() {
                   Manage Pro
                 </Button>
               )}
+              <Button
+                variant={isCEOMode ? "default" : "outline"}
+                onClick={() => {
+                  setIsCEOMode((current) => {
+                    const newValue = !current
+                    toast.success(newValue ? 'CEO Dashboard Activated' : 'CEO Dashboard Deactivated', {
+                      description: newValue ? 'Welcome to executive view' : 'Returned to standard view'
+                    })
+                    return newValue
+                  })
+                }}
+                className="gap-2"
+                title={isCEOMode ? "Exit CEO Dashboard" : "CEO Dashboard"}
+              >
+                <Lightning weight="fill" size={20} />
+                {isCEOMode ? 'Exit CEO' : 'CEO Mode'}
+              </Button>
               <Button
                 variant="outline"
                 size="icon"
