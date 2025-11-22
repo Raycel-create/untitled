@@ -106,7 +106,7 @@ function App() {
   const [stripeConfigOpen, setStripeConfigOpen] = useState(false)
   const [stripeCheckoutOpen, setStripeCheckoutOpen] = useState(false)
   const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
-  const [isCEOMode, setIsCEOMode] = useKV<boolean>('ceo-mode-enabled', false)
+  const [isCEOMode, setIsCEOMode] = useKV('ceo-mode-enabled', false)
   const [keyBuffer, setKeyBuffer] = useState('')
   
   const fileInputRef = useRef<HTMLInputElement>(null)
