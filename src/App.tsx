@@ -21,6 +21,7 @@ import { StripeConfigDialog } from '@/components/StripeConfigDialog'
 import { StripeCheckout } from '@/components/StripeCheckout'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { CEODashboard } from '@/components/CEODashboard'
+import { AdminLogin } from '@/components/AdminLogin'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -32,6 +33,12 @@ import {
 import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
 import { initializeAuth, type User, type AuthState } from '@/lib/auth'
 import { getStoredStripeConfig, simulateSuccessfulPayment } from '@/lib/stripe'
+import { 
+  createAdminSession, 
+  isAdminSessionValid, 
+  initializeAdminSession,
+  type AdminSession 
+} from '@/lib/admin-auth'
 
 type MediaType = 'image' | 'video'
 
@@ -106,8 +113,8 @@ function App() {
   const [stripeConfigOpen, setStripeConfigOpen] = useState(false)
   const [stripeCheckoutOpen, setStripeCheckoutOpen] = useState(false)
   const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
-  const [isCEOMode, setIsCEOMode] = useKV('ceo-mode-enabled', false)
-  const [keyBuffer, setKeyBuffer] = useState('')
+  const [adminSession, setAdminSession] = useKV<AdminSession>('admin-session', initializeAdminSession())
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -116,38 +123,10 @@ function App() {
   const hasConfiguredKeys = hasAnyProvider(apiKeys ?? {})
   const stripeConfig = getStoredStripeConfig()
   const hasStripeConfigured = !!stripeConfig
+  const isCEOMode = isAdminSessionValid(adminSession ?? null)
 
   useEffect(() => {
     setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
-  }, [])
-
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
-        return
-      }
-
-      setKeyBuffer(prev => {
-        const newBuffer = (prev + e.key).slice(-20)
-        
-        if (newBuffer.includes('adminadmin19780111')) {
-          setIsCEOMode((current) => {
-            if (!current) {
-              toast.success('CEO Dashboard Activated', {
-                description: 'Welcome to executive view'
-              })
-            }
-            return true
-          })
-          return ''
-        }
-        
-        return newBuffer
-      })
-    }
-
-    window.addEventListener('keypress', handleKeyPress)
-    return () => window.removeEventListener('keypress', handleKeyPress)
   }, [])
 
   useEffect(() => {
@@ -174,7 +153,7 @@ function App() {
 
   if (isCEOMode) {
     return <CEODashboard onSignOut={() => {
-      setIsCEOMode(false)
+      setAdminSession(initializeAdminSession())
       toast.success('CEO Dashboard Deactivated', {
         description: 'Returned to standard view'
       })
@@ -568,13 +547,14 @@ function App() {
               <Button
                 variant={isCEOMode ? "default" : "outline"}
                 onClick={() => {
-                  setIsCEOMode((current) => {
-                    const newValue = !current
-                    toast.success(newValue ? 'CEO Dashboard Activated' : 'CEO Dashboard Deactivated', {
-                      description: newValue ? 'Welcome to executive view' : 'Returned to standard view'
+                  if (isCEOMode) {
+                    setAdminSession(initializeAdminSession())
+                    toast.success('CEO Dashboard Deactivated', {
+                      description: 'Returned to standard view'
                     })
-                    return newValue
-                  })
+                  } else {
+                    setAdminLoginOpen(true)
+                  }
                 }}
                 className="gap-2"
                 title={isCEOMode ? "Exit CEO Dashboard" : "CEO Dashboard"}
@@ -1243,6 +1223,14 @@ function App() {
       <APIKeyManager
         open={apiKeyManagerOpen}
         onOpenChange={setApiKeyManagerOpen}
+      />
+
+      <AdminLogin
+        open={adminLoginOpen}
+        onOpenChange={setAdminLoginOpen}
+        onAuthenticated={() => {
+          setAdminSession(createAdminSession())
+        }}
       />
     </div>
   )

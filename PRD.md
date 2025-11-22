@@ -20,18 +20,18 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Success criteria**: Secure password validation, session persistence, smooth role-based routing
 
 ### CEO Dashboard
-- **Functionality**: Executive control panel with API key management, bank integrations, analytics overview
-- **Purpose**: Provide business leaders with operational control and financial visibility
-- **Trigger**: User with 'ceo' role signs in
-- **Progression**: Sign in as CEO → Dashboard loads → View metrics → Manage API keys → Connect banks → Monitor activity
-- **Success criteria**: All executive functions accessible, real-time updates, secure credential storage
+- **Functionality**: Secure executive control panel with admin authentication, API key management, bank integrations, analytics overview, and real-time metrics
+- **Purpose**: Provide business leaders with operational control and financial visibility through password-protected access
+- **Trigger**: User clicks "CEO Mode" button and enters valid admin credentials (username: adminadmin, password: 19780111)
+- **Progression**: Click CEO Mode → Admin login modal appears → Enter credentials → Authenticate → Dashboard loads → View metrics → Manage API keys → Connect banks → Monitor activity → Sign out to return to main app
+- **Success criteria**: Secure authentication with password protection, 8-hour session persistence, all executive functions accessible, real-time updates, secure credential storage
 
-### CEO Dashboard
-- **Functionality**: Executive control panel with API key management, bank integrations, analytics overview
-- **Purpose**: Provide business leaders with operational control and financial visibility
-- **Trigger**: User with 'ceo' role signs in
-- **Progression**: Sign in as CEO → Dashboard loads → View metrics → Manage API keys → Connect banks → Monitor activity
-- **Success criteria**: All executive functions accessible, real-time updates, secure credential storage
+### Admin Authentication
+- **Functionality**: Password-protected admin login system for CEO dashboard access with session management
+- **Purpose**: Secure executive features behind authentication, preventing unauthorized access to sensitive business controls
+- **Trigger**: User clicks "CEO Mode" button in main header
+- **Progression**: Click CEO Mode → Login dialog opens → Enter username and password → Validate credentials → Create 8-hour session → Grant access to CEO dashboard → Session persists across refreshes → Expires after 8 hours or manual logout
+- **Success criteria**: Credentials validated securely, sessions persist properly, clear error messages for failed attempts, smooth authentication flow
 
 ### Bank Integration
 - **Functionality**: Connect and manage multiple business bank accounts with balance tracking
@@ -130,6 +130,9 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Invalid Credentials**: Clear error messages, no account lockout on demo
 - **Role-Based Access**: CEO sees dashboard, regular users see creative studio
 - **Session Persistence**: Auth state survives refresh, sign out clears completely
+- **Admin Authentication Failures**: Clear error messaging for incorrect credentials, no account lockout, credential input cleared after failed attempt
+- **Expired Admin Sessions**: Auto-logout after 8 hours, redirect to main app, require re-authentication for CEO access
+- **CEO Mode Access Attempts**: Button always visible, authentication dialog prevents unauthorized access
 - **No API Keys Configured**: Banner displayed prominently, generation disabled with clear messaging, one-click access to key management
 - **Invalid API Keys**: Format validation on input, helpful error messages guide correction
 - **API Request Failures**: Detect provider errors vs network issues, show specific error messages, suggest checking API key validity
@@ -220,6 +223,8 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Sparkles (Phosphor) for generate buttons (AI magic)
   - Crown (Phosphor) for CEO role and pro tier badge
   - Shield (Phosphor) for authentication/security
+  - Lock (Phosphor) for admin authentication
+  - SignIn (Phosphor) for login actions
   - SignOut (Phosphor) for logout actions
   - Bank (Phosphor) for financial features
   - Wallet (Phosphor) for balance display
@@ -231,8 +236,7 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - X (Phosphor) for modal close
   - Play/Pause (Phosphor) for video controls
   - ChatCircleDots (Phosphor) for AI assistant
-  - Crown (Phosphor) for pro tier badge
-  - Lightning (Phosphor) for upgrade prompts
+  - Lightning (Phosphor) for CEO mode toggle and upgrade prompts
   - Question (Phosphor) for help hints
   - Key (Phosphor) for API key management
   - Eye/EyeSlash (Phosphor) for show/hide API keys
