@@ -1,266 +1,327 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useKV } from '@github/spark/hooks'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowClockwise, Trophy } from '@phosphor-icons/react'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause } from '@phosphor-icons/react'
+import { toast } from 'sonner'
 
-type GameState = 'waiting' | 'playing' | 'gameover'
+type MediaType = 'image' | 'video'
 
-interface Pipe {
-  x: number
-  gapY: number
-  passed: boolean
+interface MediaItem {
+  id: string
+  type: MediaType
+  prompt: string
+  url: string
+  createdAt: number
 }
 
-const GRAVITY = 0.6
-const JUMP_STRENGTH = -10
-const PIPE_WIDTH = 80
-const PIPE_GAP = 180
-const PIPE_SPACING = 300
-const SCROLL_SPEED = 3
-const BANANA_SIZE = 40
-const MAX_VELOCITY = 12
-
 function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [gameState, setGameState] = useState<GameState>('waiting')
-  const [score, setScore] = useState(0)
-  const [highScore, setHighScore] = useKV<number>('nano-banana-highscore', 0)
-  const [showScorePop, setShowScorePop] = useState(false)
-  const isMobile = useIsMobile()
+  const [mode, setMode] = useState<MediaType>('image')
+  const [prompt, setPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [gallery, setGallery] = useKV<MediaItem[]>('ai-creator-gallery', [])
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
 
-  const gameRef = useRef({
-    bananaNeutralY: 0,
-    bananaY: 0,
-    bananaVelocity: 0,
-    bananaRotation: 0,
-    pipes: [] as Pipe[],
-    frameCount: 0,
-    canvasWidth: 0,
-    canvasHeight: 0,
-  })
+  const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
 
-  const resetGame = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    gameRef.current.bananaY = canvas.height / 2
-    gameRef.current.bananaNeutralY = canvas.height / 2
-    gameRef.current.bananaVelocity = 0
-    gameRef.current.bananaRotation = 0
-    gameRef.current.pipes = []
-    gameRef.current.frameCount = 0
-    setScore(0)
-    setGameState('waiting')
-  }
-
-  const handleInput = () => {
-    if (gameState === 'waiting') {
-      setGameState('playing')
-      gameRef.current.bananaVelocity = JUMP_STRENGTH
-    } else if (gameState === 'playing') {
-      gameRef.current.bananaVelocity = JUMP_STRENGTH
-    } else if (gameState === 'gameover') {
-      resetGame()
-    }
-  }
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-      gameRef.current.canvasWidth = canvas.width
-      gameRef.current.canvasHeight = canvas.height
-      gameRef.current.bananaY = canvas.height / 2
-      gameRef.current.bananaNeutralY = canvas.height / 2
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      toast.error('Please enter a prompt')
+      return
     }
 
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
+    setIsGenerating(true)
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault()
-        handleInput()
-      }
-    }
+    try {
+      const promptText = `You are an AI art director. Based on this user prompt: "${prompt}", create a detailed, vivid description suitable for image generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`
+      
+      const enhancedPrompt = await window.spark.llm(promptText, 'gpt-4o-mini')
 
-    window.addEventListener('keydown', handleKeyDown)
+      const mockUrl = mode === 'image' 
+        ? `https://picsum.photos/seed/${Date.now()}/800/600`
+        : `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
 
-    let animationId: number
+      await new Promise(resolve => setTimeout(resolve, mode === 'image' ? 2000 : 4000))
 
-    const gameLoop = () => {
-      const game = gameRef.current
-      const canvas = canvasRef.current
-      if (!canvas || !ctx) return
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-      if (gameState === 'playing') {
-        game.bananaVelocity += GRAVITY
-        game.bananaVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, game.bananaVelocity))
-        game.bananaY += game.bananaVelocity
-
-        game.bananaRotation = (game.bananaVelocity / MAX_VELOCITY) * 30
-
-        game.frameCount++
-
-        if (game.frameCount % (PIPE_SPACING / SCROLL_SPEED) === 0) {
-          const minGapY = PIPE_GAP / 2 + 50
-          const maxGapY = canvas.height - PIPE_GAP / 2 - 50
-          game.pipes.push({
-            x: canvas.width,
-            gapY: Math.random() * (maxGapY - minGapY) + minGapY,
-            passed: false,
-          })
-        }
-
-        game.pipes = game.pipes.filter((pipe) => pipe.x + PIPE_WIDTH > 0)
-
-        game.pipes.forEach((pipe) => {
-          pipe.x -= SCROLL_SPEED
-
-          if (!pipe.passed && pipe.x + PIPE_WIDTH < canvas.width / 2 - BANANA_SIZE / 2) {
-            pipe.passed = true
-            setScore((s) => {
-              const newScore = s + 1
-              setShowScorePop(true)
-              setTimeout(() => setShowScorePop(false), 200)
-              return newScore
-            })
-          }
-        })
-
-        const bananaX = canvas.width / 2
-        const bananaTop = game.bananaY - BANANA_SIZE / 2
-        const bananaBottom = game.bananaY + BANANA_SIZE / 2
-        const bananaLeft = bananaX - BANANA_SIZE / 2
-        const bananaRight = bananaX + BANANA_SIZE / 2
-
-        if (bananaTop <= 0 || bananaBottom >= canvas.height) {
-          setGameState('gameover')
-          if (score > (highScore ?? 0)) {
-            setHighScore(score)
-          }
-        }
-
-        for (const pipe of game.pipes) {
-          const pipeLeft = pipe.x
-          const pipeRight = pipe.x + PIPE_WIDTH
-          const gapTop = pipe.gapY - PIPE_GAP / 2
-          const gapBottom = pipe.gapY + PIPE_GAP / 2
-
-          if (bananaRight > pipeLeft && bananaLeft < pipeRight) {
-            if (bananaTop < gapTop || bananaBottom > gapBottom) {
-              setGameState('gameover')
-              if (score > (highScore ?? 0)) {
-                setHighScore(score)
-              }
-              break
-            }
-          }
-        }
+      const newItem: MediaItem = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: mode,
+        prompt: prompt,
+        url: mockUrl,
+        createdAt: Date.now(),
       }
 
-      game.pipes.forEach((pipe) => {
-        ctx.fillStyle = 'oklch(0.65 0.18 145)'
-
-        ctx.beginPath()
-        ctx.roundRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY - PIPE_GAP / 2, [0, 0, 12, 12])
-        ctx.fill()
-
-        ctx.beginPath()
-        ctx.roundRect(pipe.x, pipe.gapY + PIPE_GAP / 2, PIPE_WIDTH, canvas.height, [12, 12, 0, 0])
-        ctx.fill()
-      })
-
-      ctx.save()
-      ctx.translate(canvas.width / 2, game.bananaY)
-      ctx.rotate((game.bananaRotation * Math.PI) / 180)
-      ctx.font = `${BANANA_SIZE}px Arial`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText('🍌', 0, 0)
-      ctx.restore()
-
-      animationId = requestAnimationFrame(gameLoop)
+      setGallery(current => [...(current ?? []), newItem])
+      
+      toast.success(`${mode === 'image' ? 'Image' : 'Video'} generated successfully!`)
+      setPrompt('')
+    } catch (error) {
+      toast.error('Generation failed. Please try again.')
+      console.error(error)
+    } finally {
+      setIsGenerating(false)
     }
+  }
 
-    gameLoop()
+  const handleDelete = (id: string) => {
+    setGallery(current => (current ?? []).filter(item => item.id !== id))
+    setSelectedMedia(null)
+    toast.success('Deleted successfully')
+  }
 
-    return () => {
-      window.removeEventListener('resize', resizeCanvas)
-      window.removeEventListener('keydown', handleKeyDown)
-      cancelAnimationFrame(animationId)
-    }
-  }, [gameState, score, highScore, setHighScore])
+  const handleDownload = (item: MediaItem) => {
+    const link = document.createElement('a')
+    link.href = item.url
+    link.download = `${item.type}-${item.id}.${item.type === 'image' ? 'jpg' : 'mp4'}`
+    link.click()
+    toast.success('Download started')
+  }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        onClick={handleInput}
-        className="absolute inset-0 cursor-pointer"
-      />
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight mb-2">AI Creator Studio</h1>
+          <p className="text-muted-foreground">Generate stunning images and videos with AI</p>
+        </header>
 
-      <div className="absolute top-8 left-0 right-0 flex justify-center pointer-events-none">
-        <div
-          className={`text-white font-bold text-5xl md:text-6xl transition-transform duration-200 ${
-            showScorePop ? 'scale-125' : 'scale-100'
-          }`}
-          style={{ textShadow: '0 4px 8px rgba(0,0,0,0.3)' }}
-        >
-          {score}
+        <div className="grid lg:grid-cols-[400px_1fr] gap-8">
+          <div className="space-y-6">
+            <Card className="p-6">
+              <Tabs value={mode} onValueChange={(v) => setMode(v as MediaType)}>
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="image" className="gap-2">
+                    <ImageIcon weight="fill" />
+                    Image
+                  </TabsTrigger>
+                  <TabsTrigger value="video" className="gap-2">
+                    <VideoCamera weight="fill" />
+                    Video
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="image" className="mt-0 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Describe your image
+                    </label>
+                    <Textarea
+                      placeholder="A serene mountain landscape at sunset, with vibrant orange and purple skies..."
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={6}
+                      className="resize-none"
+                      disabled={isGenerating}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {prompt.length} characters
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !prompt.trim()}
+                    className="w-full gap-2"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="animate-spin">⟳</div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkle weight="fill" />
+                        Generate Image
+                      </>
+                    )}
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="video" className="mt-0 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Describe your video
+                    </label>
+                    <Textarea
+                      placeholder="A time-lapse of a bustling city street transitioning from day to night..."
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={6}
+                      className="resize-none"
+                      disabled={isGenerating}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {prompt.length} characters
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !prompt.trim()}
+                    className="w-full gap-2 bg-accent hover:bg-accent/90"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="animate-spin">⟳</div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkle weight="fill" />
+                        Generate Video
+                      </>
+                    )}
+                  </Button>
+                </TabsContent>
+              </Tabs>
+            </Card>
+
+            {isGenerating && (
+              <Card className="p-6 shimmer">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="animate-pulse">
+                      <Sparkle weight="fill" className="text-primary" size={24} />
+                    </div>
+                    <div>
+                      <p className="font-medium">Creating your {mode}...</p>
+                      <p className="text-sm text-muted-foreground">This may take a moment</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">
+                Your {mode === 'image' ? 'Images' : 'Videos'} ({filteredGallery.length})
+              </h2>
+            </div>
+
+            {filteredGallery.length === 0 ? (
+              <Card className="p-12 text-center">
+                <div className="flex flex-col items-center gap-4">
+                  {mode === 'image' ? (
+                    <ImageIcon size={48} weight="thin" className="text-muted-foreground" />
+                  ) : (
+                    <VideoCamera size={48} weight="thin" className="text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="text-lg font-medium mb-1">No {mode}s yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Generate your first {mode} to get started
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredGallery.map((item) => (
+                  <Card
+                    key={item.id}
+                    className="group cursor-pointer overflow-hidden transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/20"
+                    onClick={() => setSelectedMedia(item)}
+                  >
+                    <div className="aspect-video relative bg-muted">
+                      {item.type === 'image' ? (
+                        <img
+                          src={item.url}
+                          alt={item.prompt}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={item.url}
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Badge className="absolute top-2 right-2">
+                        {item.type === 'image' ? (
+                          <ImageIcon weight="fill" size={12} />
+                        ) : (
+                          <VideoCamera weight="fill" size={12} />
+                        )}
+                      </Badge>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm line-clamp-2">{item.prompt}</p>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {gameState === 'waiting' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <Card className="p-8 text-center pointer-events-auto">
-            <h1 className="text-4xl font-bold mb-4 text-card-foreground">Nano Banana</h1>
-            <p className="text-lg mb-6 text-muted-foreground">
-              {isMobile ? 'TAP TO PLAY' : 'CLICK OR PRESS SPACE'}
-            </p>
-            {highScore && highScore > 0 && (
-              <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                <Trophy weight="fill" className="text-primary" />
-                <span className="font-semibold">High Score: {highScore}</span>
+      <Dialog open={!!selectedMedia} onOpenChange={() => setSelectedMedia(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedMedia?.type === 'image' ? (
+                <ImageIcon weight="fill" />
+              ) : (
+                <VideoCamera weight="fill" />
+              )}
+              {selectedMedia?.type === 'image' ? 'Image' : 'Video'} Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedMedia && (
+            <div className="space-y-4">
+              <div className="rounded-lg overflow-hidden bg-muted">
+                {selectedMedia.type === 'image' ? (
+                  <img
+                    src={selectedMedia.url}
+                    alt={selectedMedia.prompt}
+                    className="w-full h-auto"
+                  />
+                ) : (
+                  <div className="relative">
+                    <video
+                      src={selectedMedia.url}
+                      className="w-full h-auto"
+                      controls
+                      autoPlay
+                      loop
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </Card>
-        </div>
-      )}
-
-      {gameState === 'gameover' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-150">
-          <Card className="p-8 text-center pointer-events-auto">
-            <h2 className="text-3xl font-bold mb-4 text-card-foreground">Game Over!</h2>
-            <div className="space-y-2 mb-6">
-              <p className="text-2xl font-semibold text-card-foreground">Score: {score}</p>
-              {score === highScore && score > 0 && (
-                <p className="text-lg text-primary font-semibold">🎉 New High Score!</p>
-              )}
-              {highScore && highScore > 0 && score !== highScore && (
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <Trophy weight="fill" className="text-primary" />
-                  <span>Best: {highScore}</span>
-                </div>
-              )}
+              <div>
+                <h3 className="text-sm font-medium mb-1">Prompt</h3>
+                <p className="text-sm text-muted-foreground">{selectedMedia.prompt}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleDownload(selectedMedia)}
+                  variant="outline"
+                  className="flex-1 gap-2"
+                >
+                  <Download weight="bold" />
+                  Download
+                </Button>
+                <Button
+                  onClick={() => handleDelete(selectedMedia.id)}
+                  variant="destructive"
+                  className="flex-1 gap-2"
+                >
+                  <Trash weight="bold" />
+                  Delete
+                </Button>
+              </div>
             </div>
-            <Button onClick={handleInput} size="lg" className="gap-2">
-              <ArrowClockwise weight="bold" />
-              Play Again
-            </Button>
-          </Card>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

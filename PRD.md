@@ -1,125 +1,141 @@
 # Planning Guide
 
-A fast-paced, one-button arcade game where players navigate a banana through obstacle gaps, testing reflexes and timing in an endless runner format.
+An AI-powered creative studio that generates stunning images and videos from text descriptions, enabling users to bring their visual ideas to life through simple prompts.
 
 **Experience Qualities**: 
-1. **Immediate** - Zero friction from load to gameplay; tap to start, tap to play
-2. **Addictive** - Quick death-retry loop that compels "just one more try" engagement
-3. **Satisfying** - Crisp physics and responsive controls that feel rewarding to master
+1. **Inspiring** - Beautiful gallery showcasing AI's creative potential, encouraging experimentation
+2. **Effortless** - Clean prompt-to-creation flow with minimal clicks between idea and output
+3. **Delightful** - Smooth generation states and satisfying reveal animations that celebrate each creation
 
-**Complexity Level**: Micro Tool (single-purpose)
-  - Pure arcade gameplay with minimal UI chrome; entire experience revolves around the core mechanic of timing taps to navigate obstacles
+**Complexity Level**: Light Application (multiple features with basic state)
+  - Dual-mode creation tool with persistent gallery, focusing on streamlined AI generation workflow with organized content management
 
 ## Essential Features
 
-### Banana Flight Control
-- **Functionality**: Player taps/clicks to make banana jump upward, gravity pulls it down
-- **Purpose**: Core mechanic providing skill-based challenge through timing
-- **Trigger**: Any tap/click on game area or spacebar press
-- **Progression**: Game starts → Tap to begin → Each tap applies upward velocity → Gravity constantly pulls down → Player maintains altitude through gaps
-- **Success criteria**: Banana responds instantly (<100ms) to input with smooth physics
+### Text-to-Image Generation
+- **Functionality**: User enters text prompt, AI generates corresponding image
+- **Purpose**: Enable quick visual ideation and artistic exploration
+- **Trigger**: User types prompt and clicks "Generate Image" button
+- **Progression**: Enter prompt → Click generate → Loading state with progress → Image reveals → Auto-saves to gallery → Option to regenerate or create new
+- **Success criteria**: Images appear within 10 seconds, full resolution, properly formatted
 
-### Scrolling Obstacles
-- **Functionality**: Vertical pipes with gaps scroll from right to left at constant speed
-- **Purpose**: Create challenge requiring precise altitude control
-- **Trigger**: Starts automatically when game begins
-- **Progression**: Pipes spawn off-right → Move leftward at steady pace → Despawn off-left → New pipes spawn with random gap positions
-- **Success criteria**: Smooth 60fps scrolling, fair gap sizes (3-4x banana height), consistent spacing
+### Text-to-Video Generation
+- **Functionality**: User enters text prompt, AI generates short video clip
+- **Purpose**: Bring dynamic motion and storytelling to creative ideas
+- **Trigger**: User types prompt and clicks "Generate Video" button
+- **Progression**: Enter prompt → Click generate → Extended loading with progress indicator → Video reveals with playback controls → Auto-saves to gallery → Option to regenerate or create new
+- **Success criteria**: Videos load properly, playback controls work smoothly, reasonable resolution and duration
 
-### Collision Detection
-- **Functionality**: Detect when banana hits pipes or boundaries (top/bottom)
-- **Purpose**: Enforce challenge and trigger game over state
-- **Trigger**: Every frame checks banana position against obstacles
-- **Progression**: Continuous checking → Collision detected → Game freezes → Show score → Restart prompt
-- **Success criteria**: Pixel-perfect detection with no false positives/negatives
+### Persistent Gallery
+- **Functionality**: Display all previously generated media in organized grid
+- **Purpose**: Maintain creation history and enable revisiting past works
+- **Trigger**: Automatically updates when new media is generated
+- **Progression**: Media generated → Saved to storage → Appears in gallery grid → Click to view fullscreen → Delete option available
+- **Success criteria**: All generated content persists between sessions, organized chronologically, quick access
 
-### Score System
-- **Functionality**: Increment counter each time banana passes through pipe gap
-- **Purpose**: Provide achievement metric and replayability motivation
-- **Trigger**: When banana's center crosses pipe's right edge
-- **Progression**: Start at 0 → +1 per cleared pipe → Display current score → Save high score → Show both on game over
-- **Success criteria**: Score increments exactly once per pipe, high score persists between sessions
+### Media Preview & Management
+- **Functionality**: Click any gallery item to view in fullscreen modal with actions
+- **Purpose**: Examine details and manage individual creations
+- **Trigger**: Click on gallery thumbnail
+- **Progression**: Click thumbnail → Modal opens with full media → View controls (play/pause for video) → Download or delete options → Close to return
+- **Success criteria**: Smooth modal transitions, video playback works reliably, downloads preserve quality
 
-### Quick Restart
-- **Functionality**: Instant restart on tap after death
-- **Purpose**: Minimize friction in death-retry loop to maintain engagement
-- **Trigger**: Any tap/click after game over
-- **Progression**: Game over shown → Tap anywhere → Instant reset to start position → Resume play
-- **Success criteria**: <200ms from tap to playable state
+### Mode Switching
+- **Functionality**: Toggle between image and video creation modes
+- **Purpose**: Clear separation of creation types with appropriate UI/prompting
+- **Trigger**: User clicks mode toggle tabs
+- **Progression**: Select mode → UI updates with mode-specific prompt suggestions → Generate appropriate media type → Gallery filters to show current mode
+- **Success criteria**: Instant mode switching, no state loss, clear visual distinction
 
 ## Edge Case Handling
 
-- **Rapid Tapping**: Cap maximum upward velocity to prevent banana flying off-screen
-- **Pause/Unfocus**: Game pauses automatically when tab loses focus to prevent unfair deaths
-- **Initial State**: Game waits for first input before starting obstacle movement
-- **High Score Loss**: Gracefully handle missing stored data, default to 0
-- **Window Resize**: Maintain playable state and relative positions during resize
+- **Generation Failures**: Show clear error message with retry option, don't lose prompt text
+- **Long Prompts**: Support multi-line text areas with character count, reasonable limits
+- **Empty Prompts**: Disable generate button until valid text entered
+- **Slow Generations**: Show engaging loading states with time estimates
+- **Storage Limits**: Graceful handling if gallery grows large, oldest items managed appropriately
+- **Network Issues**: Detect connectivity problems, show appropriate messaging
 
 ## Design Direction
 
-The design should feel playful yet focused, with a minimalist interface that removes all visual noise except the essential gameplay elements, using bright cheerful colors that evoke casual mobile gaming while maintaining sharp, clear readability.
+The design should feel professional yet approachable, like a modern creative tool with a gallery-forward interface that showcases the AI's output quality, using a sophisticated dark theme with vibrant accent colors that make generated content pop visually.
 
 ## Color Selection
 
-Triadic color scheme to create vibrant, energetic contrast that keeps the eye engaged during fast gameplay.
+Custom palette emphasizing a modern dark theme with electric accent colors for a premium creative tool aesthetic.
 
-- **Primary Color**: Sky Blue (oklch(0.75 0.15 230)) - Conveys open sky background, creates calming canvas for action
+- **Primary Color**: Electric Purple (oklch(0.65 0.25 290)) - Represents AI creativity and innovation, eye-catching CTAs
 - **Secondary Colors**: 
-  - Grass Green (oklch(0.65 0.18 145)) - Represents pipe obstacles, natural contrast to sky
-  - Ground Brown (oklch(0.45 0.08 60)) - Defines play boundaries at top/bottom
-- **Accent Color**: Banana Yellow (oklch(0.88 0.18 95)) - Hero character color, pops against all backgrounds
+  - Deep Slate (oklch(0.20 0.02 250)) - Main background, creates depth and focus
+  - Soft Cyan (oklch(0.75 0.15 210)) - Secondary actions and highlights
+- **Accent Color**: Vibrant Pink (oklch(0.70 0.25 350)) - Video mode indicator, active states, energy
 - **Foreground/Background Pairings**:
-  - Background (Sky Blue oklch(0.75 0.15 230)): White text (oklch(1 0 0)) - Ratio 5.2:1 ✓
-  - Pipes (Grass Green oklch(0.65 0.18 145)): White text (oklch(1 0 0)) - Ratio 4.8:1 ✓
-  - UI Card (White oklch(0.98 0 0)): Dark text (oklch(0.25 0 0)) - Ratio 14.1:1 ✓
-  - Accent (Banana Yellow oklch(0.88 0.18 95)): Dark text (oklch(0.25 0 0)) - Ratio 12.3:1 ✓
+  - Background (Deep Slate oklch(0.20 0.02 250)): White text (oklch(0.98 0 0)) - Ratio 14.2:1 ✓
+  - Card (oklch(0.25 0.02 250)): White text (oklch(0.98 0 0)) - Ratio 12.8:1 ✓
+  - Primary (Electric Purple oklch(0.65 0.25 290)): White text (oklch(0.98 0 0)) - Ratio 5.1:1 ✓
+  - Accent (Vibrant Pink oklch(0.70 0.25 350)): White text (oklch(0.98 0 0)) - Ratio 5.8:1 ✓
 
 ## Font Selection
 
-Typography should be bold and instantly readable even during fast motion, using a rounded geometric sans-serif that matches the playful, arcade-style aesthetic.
+Typography should feel modern and technical yet friendly, using a clean geometric sans-serif that conveys precision and creativity without being cold.
 
 - **Typographic Hierarchy**: 
-  - Score Display: Poppins Bold/48px/tight tracking (-0.02em) - Large, always visible during play
-  - Game Over: Poppins Bold/36px/normal tracking - Clear failure state messaging
-  - High Score: Poppins SemiBold/24px/normal tracking - Secondary information hierarchy
-  - Instructions: Poppins Medium/18px/relaxed tracking (0.01em) - Readable guidance text
+  - H1 (App Title): Inter Bold/32px/tight letter spacing (-0.01em)
+  - H2 (Section Headers): Inter SemiBold/24px/normal tracking
+  - Prompt Input: Inter Regular/16px/relaxed line-height (1.6)
+  - Button Labels: Inter Medium/14px/wide tracking (0.02em)
+  - Gallery Captions: Inter Regular/13px/normal tracking
 
 ## Animations
 
-Animations should be crisp and responsive, prioritizing gameplay clarity over decorative flourishes, with subtle juice added only where it reinforces player actions or provides critical feedback.
+Motion should feel fluid and purposeful, with smooth state transitions that guide attention to new content while maintaining a premium, polished feel throughout the experience.
 
-- **Purposeful Meaning**: Rotation of banana based on velocity communicates trajectory, score pop reinforces achievement
+- **Purposeful Meaning**: Generation pulses communicate AI "thinking", reveal animations celebrate completion, smooth modal transitions maintain spatial context
 - **Hierarchy of Movement**: 
-  1. Player banana (critical) - Immediate rotation/position response
-  2. Score increment - Quick scale bounce on +1
-  3. Game over overlay - Fast fade-in (150ms) to restart quickly
-  4. Background parallax - Subtle depth, slowest movement
+  1. Generation state (critical) - Pulsing indicators, progress animations
+  2. Media reveals - Satisfying fade + scale-up on completion
+  3. Modal transitions - Smooth backdrop blur with content slide-in
+  4. Gallery updates - Gentle fade-in for new items
+  5. Hover states - Subtle lift and glow on interactive elements
 
 ## Component Selection
 
 - **Components**: 
-  - Custom Canvas element for game rendering (60fps required, shadcn not applicable)
-  - Card for game over overlay with score display
-  - Button for restart action on game over screen (if user clicks UI rather than anywhere)
+  - Tabs for mode switching (Image/Video)
+  - Textarea for prompt input with character counter
+  - Button for generate actions with loading states
+  - Card for gallery items with hover effects
+  - Dialog for fullscreen media preview
+  - Progress indicator during generation
+  - Badge for media type labels
+  - Separator for visual section breaks
 - **Customizations**: 
-  - Full-viewport canvas game area
-  - Custom hitbox visualization (debug mode)
-  - Score counter overlay positioned top-center
-  - Banana sprite rendered as emoji or custom SVG
-  - Pipe rendering with rounded caps using canvas rounded rectangles
+  - Custom video player controls overlay
+  - Gradient overlays on gallery thumbnails for text readability
+  - Shimmer loading effect for generation states
+  - Custom scrollbar styling for gallery area
 - **States**: 
-  - Game States: waiting → playing → game-over
-  - Banana: normal flight vs. collision flash (red tint)
-  - Score: normal vs. increment animation (scale 1 → 1.2 → 1)
+  - Generate button: default → loading (with spinner) → success
+  - Gallery items: default → hover (lift + glow) → selected (modal open)
+  - Mode tabs: inactive (muted) → active (primary color + underline)
+  - Textarea: empty (placeholder) → typing → valid (ready to generate)
 - **Icon Selection**: 
-  - ArrowClockwise (Phosphor) for restart button
-  - Trophy (Phosphor) for high score indicator
+  - Sparkles (Phosphor) for generate buttons (AI magic)
+  - Image (Phosphor) for image mode tab
+  - Video (Phosphor) for video mode tab
+  - Download (Phosphor) for save actions
+  - Trash (Phosphor) for delete actions
+  - X (Phosphor) for modal close
+  - Play/Pause (Phosphor) for video controls
 - **Spacing**: 
-  - Score: mt-8 from top edge
-  - Game over card: Centered with p-8 internal padding
-  - Gap-4 between score elements in overlay
+  - Container: max-w-7xl mx-auto with px-4 sm:px-6 lg:px-8
+  - Sections: gap-8 between major sections
+  - Gallery grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4
+  - Form elements: gap-4 in prompt area
+  - Card padding: p-6 for main content areas
 - **Mobile**: 
-  - Touch events work identically to clicks
-  - Full-screen canvas fills viewport on all devices
-  - Score text scales down to 36px on screens <640px
-  - Simplified instructions: "TAP TO PLAY" on mobile vs "CLICK OR SPACE" on desktop
+  - Stack mode tabs vertically on small screens
+  - Single column gallery on mobile
+  - Fullscreen modals take entire viewport
+  - Larger touch targets (min 44x44px) for all interactive elements
+  - Collapsible prompt suggestions to save space
