@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useKV } from '@github/spark/hooks'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Lock, SignIn, ShieldCheck, ArrowLeft, Timer } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { validateAdminCredentials, type AdminCredentials, createMFACode, validateMFACode, type MFACode } from '@/lib/admin-auth'
+import { validateAdminCredentials, initializeAdminCredentials, type AdminCredentials, type StoredAdminCredentials, createMFACode, validateMFACode, type MFACode } from '@/lib/admin-auth'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 
@@ -18,6 +19,10 @@ interface AdminLoginProps {
 type AuthStep = 'credentials' | 'mfa'
 
 export function AdminLogin({ open, onOpenChange, onAuthenticated }: AdminLoginProps) {
+  const [storedCredentials] = useKV<StoredAdminCredentials>(
+    'admin-credentials',
+    initializeAdminCredentials()
+  )
   const [step, setStep] = useState<AuthStep>('credentials')
   const [credentials, setCredentials] = useState<AdminCredentials>({
     username: '',
@@ -53,7 +58,7 @@ export function AdminLogin({ open, onOpenChange, onAuthenticated }: AdminLoginPr
 
     await new Promise(resolve => setTimeout(resolve, 500))
 
-    if (validateAdminCredentials(credentials)) {
+    if (validateAdminCredentials(credentials, storedCredentials || null)) {
       const newMFACode = createMFACode()
       setMFACode(newMFACode)
       setStep('mfa')

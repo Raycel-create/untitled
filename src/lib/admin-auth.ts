@@ -3,6 +3,12 @@ export interface AdminCredentials {
   password: string
 }
 
+export interface StoredAdminCredentials {
+  username: string
+  password: string
+  updatedAt?: number
+}
+
 export interface AdminSession {
   isAuthenticated: boolean
   authenticatedAt?: number
@@ -16,15 +22,38 @@ export interface MFACode {
   attempts: number
 }
 
-const ADMIN_USERNAME = 'adminadmin'
-const ADMIN_PASSWORD = '19780111'
+const DEFAULT_ADMIN_USERNAME = 'adminadmin'
+const DEFAULT_ADMIN_PASSWORD = '19780111'
 const SESSION_DURATION = 8 * 60 * 60 * 1000
 const MFA_CODE_LENGTH = 6
 const MFA_CODE_EXPIRY = 5 * 60 * 1000
 const MAX_MFA_ATTEMPTS = 3
 
-export function validateAdminCredentials(credentials: AdminCredentials): boolean {
-  return credentials.username === ADMIN_USERNAME && credentials.password === ADMIN_PASSWORD
+export function initializeAdminCredentials(): StoredAdminCredentials {
+  return {
+    username: DEFAULT_ADMIN_USERNAME,
+    password: DEFAULT_ADMIN_PASSWORD,
+    updatedAt: Date.now()
+  }
+}
+
+export function validateAdminCredentials(
+  credentials: AdminCredentials, 
+  storedCredentials: StoredAdminCredentials | null
+): boolean {
+  const stored = storedCredentials || initializeAdminCredentials()
+  return credentials.username === stored.username && credentials.password === stored.password
+}
+
+export function updateAdminCredentials(
+  newUsername: string,
+  newPassword: string
+): StoredAdminCredentials {
+  return {
+    username: newUsername,
+    password: newPassword,
+    updatedAt: Date.now()
+  }
 }
 
 export function generateMFACode(): string {

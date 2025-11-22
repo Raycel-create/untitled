@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -22,6 +22,7 @@ import { StripeCheckout } from '@/components/StripeCheckout'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { CEODashboard } from '@/components/CEODashboard'
 import { AdminLogin } from '@/components/AdminLogin'
+import { AdminSettings } from '@/components/AdminSettings'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -115,6 +116,7 @@ function App() {
   const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
   const [adminSession, setAdminSession] = useKV<AdminSession>('admin-session', initializeAdminSession())
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
+  const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -532,6 +534,15 @@ function App() {
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
                   </span>
                 )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setAdminSettingsOpen(true)}
+                className="relative"
+                title="Admin Settings"
+              >
+                <GearSix weight="fill" size={20} />
               </Button>
               {currentStatus.tier === 'pro' && (
                 <Button
@@ -1231,6 +1242,11 @@ function App() {
         onAuthenticated={() => {
           setAdminSession(createAdminSession())
         }}
+      />
+
+      <AdminSettings
+        open={adminSettingsOpen}
+        onOpenChange={setAdminSettingsOpen}
       />
     </div>
   )
