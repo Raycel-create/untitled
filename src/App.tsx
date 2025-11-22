@@ -17,7 +17,6 @@ import { PhotoEditor } from '@/components/PhotoEditor'
 import { APIKeyManager } from '@/components/APIKeyManager'
 import { APIKeyBanner } from '@/components/APIKeyBanner'
 import { LandingPage } from '@/components/LandingPage'
-import { CEODashboard } from '@/components/CEODashboard'
 import { StripeConfigDialog } from '@/components/StripeConfigDialog'
 import { StripeCheckout } from '@/components/StripeCheckout'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
@@ -139,10 +138,6 @@ function App() {
 
   if (!authState?.isAuthenticated || !authState.user) {
     return <LandingPage onAuthenticate={handleAuthenticate} />
-  }
-
-  if (authState.user.role === 'ceo') {
-    return <CEODashboard user={authState.user} onSignOut={handleSignOut} />
   }
 
   const applyAdjustmentsToCanvas = () => {

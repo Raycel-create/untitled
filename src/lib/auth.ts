@@ -2,7 +2,6 @@ export interface User {
   id: string
   email: string
   name: string
-  role: 'user' | 'ceo'
   createdAt: number
 }
 
@@ -16,12 +15,11 @@ export const initializeAuth = (): AuthState => ({
   user: null
 })
 
-export const createUser = (email: string, password: string, name: string, role: 'user' | 'ceo' = 'user'): User => {
+export const createUser = (email: string, password: string, name: string): User => {
   return {
     id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     email,
     name,
-    role,
     createdAt: Date.now()
   }
 }

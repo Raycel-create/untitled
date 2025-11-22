@@ -45,8 +45,7 @@ export function LandingPage({ onAuthenticate }: LandingPageProps) {
 
     await new Promise(resolve => setTimeout(resolve, 1500))
 
-    const role = email.toLowerCase().includes('ceo') || email.toLowerCase().includes('admin') ? 'ceo' : 'user'
-    const user = createUser(email, password, name || email.split('@')[0], role)
+    const user = createUser(email, password, name || email.split('@')[0])
     
     toast.success(authMode === 'signin' ? 'Welcome back!' : 'Account created successfully!')
     onAuthenticate(user)
@@ -54,14 +53,13 @@ export function LandingPage({ onAuthenticate }: LandingPageProps) {
     setIsLoading(false)
   }
 
-  const handleDemoSignIn = (role: 'user' | 'ceo') => {
+  const handleDemoSignIn = () => {
     const demoUser = createUser(
-      role === 'ceo' ? 'ceo@company.com' : 'demo@example.com',
+      'demo@example.com',
       'Demo123!',
-      role === 'ceo' ? 'CEO Demo' : 'Demo User',
-      role
+      'Demo User'
     )
-    toast.success(`Signed in as ${role === 'ceo' ? 'CEO' : 'Demo User'}`)
+    toast.success('Signed in as Demo User')
     onAuthenticate(demoUser)
   }
 
@@ -205,24 +203,14 @@ export function LandingPage({ onAuthenticate }: LandingPageProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDemoSignIn('user')}
-                    className="gap-2"
-                  >
-                    <Sparkle weight="fill" size={16} />
-                    Demo User
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDemoSignIn('ceo')}
-                    className="gap-2"
-                  >
-                    <Crown weight="fill" size={16} />
-                    CEO Demo
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleDemoSignIn}
+                  className="w-full gap-2"
+                >
+                  <Sparkle weight="fill" size={16} />
+                  Try Demo
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -278,30 +266,30 @@ export function LandingPage({ onAuthenticate }: LandingPageProps) {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Crown weight="fill" className="text-accent" size={24} />
-                  <CardTitle>CEO Dashboard</CardTitle>
+                  <CardTitle>Pro Features</CardTitle>
                 </div>
-                <CardDescription>Special features for executives</CardDescription>
+                <CardDescription>Unlock unlimited creative potential</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex gap-3">
                   <Check weight="bold" className="text-accent mt-1 shrink-0" size={20} />
                   <div>
-                    <p className="font-medium">API Key Management</p>
-                    <p className="text-sm text-muted-foreground">Configure and monitor API connections</p>
+                    <p className="font-medium">Unlimited Generations</p>
+                    <p className="text-sm text-muted-foreground">Create as many images and videos as you need</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <Check weight="bold" className="text-accent mt-1 shrink-0" size={20} />
                   <div>
-                    <p className="font-medium">Bank Integration</p>
-                    <p className="text-sm text-muted-foreground">Connect business accounts securely</p>
+                    <p className="font-medium">Video Generation</p>
+                    <p className="text-sm text-muted-foreground">Access advanced video creation features</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <Check weight="bold" className="text-accent mt-1 shrink-0" size={20} />
                   <div>
-                    <p className="font-medium">Analytics Dashboard</p>
-                    <p className="text-sm text-muted-foreground">Track usage and performance metrics</p>
+                    <p className="font-medium">Priority Support</p>
+                    <p className="text-sm text-muted-foreground">Get help faster with priority assistance</p>
                   </div>
                 </div>
               </CardContent>
