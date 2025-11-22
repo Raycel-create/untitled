@@ -41,6 +41,7 @@ import {
   initializeAdminSession,
   type AdminSession 
 } from '@/lib/admin-auth'
+import { generateImage, generateVideo } from '@/lib/generation'
 
 type MediaType = 'image' | 'video'
 
@@ -388,60 +389,55 @@ function App() {
 
       setGenerationStage('Enhancing prompt with AI...')
       setGenerationProgress(15)
-      await new Promise(resolve => setTimeout(resolve, 800))
 
-      const promptText = `You are an AI art director. Based on this user prompt: "${finalPrompt}", create a detailed, vivid description suitable for ${mode} generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`
-      
-      const enhancedPrompt = await window.spark.llm(promptText, 'gpt-4o-mini')
+      const enhancedPrompt = await window.spark.llm(
+        `You are an AI art director. Based on this user prompt: "${finalPrompt}", create a detailed, vivid description suitable for ${mode} generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`,
+        'gpt-4o-mini'
+      )
 
       setGenerationStage('Processing reference images...')
+      setGenerationProgress(25)
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      setGenerationStage(`Connecting to ${provider}...`)
       setGenerationProgress(30)
-      await new Promise(resolve => setTimeout(resolve, 600))
 
-      setGenerationStage(`Generating ${mode}...`)
-      setGenerationProgress(45)
-      
-      const stages = mode === 'image' 
-        ? [
-            { stage: 'Creating base composition...', progress: 55, delay: 500 },
-            { stage: 'Applying style and details...', progress: 70, delay: 600 },
-            { stage: 'Refining colors and lighting...', progress: 85, delay: 500 },
-            { stage: 'Final touches...', progress: 95, delay: 400 }
-          ]
-        : [
-            { stage: 'Generating keyframes...', progress: 55, delay: 700 },
-            { stage: 'Animating motion...', progress: 65, delay: 800 },
-            { stage: 'Rendering frames...', progress: 75, delay: 900 },
-            { stage: 'Processing effects...', progress: 85, delay: 700 },
-            { stage: 'Finalizing video...', progress: 95, delay: 600 }
-          ]
-
-      for (const { stage, progress, delay } of stages) {
-        setGenerationStage(stage)
-        setGenerationProgress(progress)
-        
-        if (mode === 'image' && progress >= 70) {
-          const seed = Date.now()
-          setPreviewUrl(`https://picsum.photos/seed/${seed}/400/300?blur=${Math.max(0, 10 - (progress - 70) / 3)}`)
+      const progressCallback = (update: { progress: number; stage: string; previewUrl?: string }) => {
+        setGenerationProgress(update.progress)
+        setGenerationStage(update.stage)
+        if (update.previewUrl) {
+          setPreviewUrl(update.previewUrl)
         }
-        
-        await new Promise(resolve => setTimeout(resolve, delay))
       }
 
-      const mockUrl = mode === 'image' 
-        ? `https://picsum.photos/seed/${Date.now()}/800/600`
-        : `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
+      let generatedUrl: string
+
+      if (mode === 'image') {
+        generatedUrl = await generateImage(
+          enhancedPrompt,
+          apiKeys ?? {},
+          provider,
+          progressCallback
+        )
+      } else {
+        generatedUrl = await generateVideo(
+          enhancedPrompt,
+          apiKeys ?? {},
+          provider,
+          progressCallback
+        )
+      }
 
       setGenerationProgress(100)
       setGenerationStage('Complete!')
-      setPreviewUrl(mockUrl)
+      setPreviewUrl(generatedUrl)
       await new Promise(resolve => setTimeout(resolve, 500))
 
       const newItem: MediaItem = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         type: mode,
         prompt: prompt,
-        url: mockUrl,
+        url: generatedUrl,
         createdAt: Date.now(),
       }
 
@@ -466,8 +462,11 @@ function App() {
         }, 1500)
       }
     } catch (error) {
-      toast.error('Generation failed. Please try again.')
-      console.error(error)
+      const errorMessage = error instanceof Error ? error.message : 'Generation failed'
+      toast.error(errorMessage, {
+        description: 'Please check your API key and try again'
+      })
+      console.error('Generation error:', error)
     } finally {
       setTimeout(() => {
         setIsGenerating(false)
