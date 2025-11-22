@@ -23,6 +23,7 @@ import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { CEODashboard } from '@/components/CEODashboard'
 import { AdminLogin } from '@/components/AdminLogin'
 import { AdminSettings } from '@/components/AdminSettings'
+import { GenerationProgress } from '@/components/GenerationProgress'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -89,6 +90,9 @@ function App() {
   const [mode, setMode] = useState<MediaType>('image')
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState(0)
+  const [generationStage, setGenerationStage] = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [gallery, setGallery] = useKV<MediaItem[]>('ai-creator-gallery', [])
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -368,6 +372,9 @@ function App() {
     }
 
     setIsGenerating(true)
+    setGenerationProgress(0)
+    setGenerationStage('Initializing...')
+    setPreviewUrl(null)
 
     try {
       let finalPrompt = prompt
@@ -379,15 +386,56 @@ function App() {
         }
       }
 
-      const promptText = `You are an AI art director. Based on this user prompt: "${finalPrompt}", create a detailed, vivid description suitable for image generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`
+      setGenerationStage('Enhancing prompt with AI...')
+      setGenerationProgress(15)
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      const promptText = `You are an AI art director. Based on this user prompt: "${finalPrompt}", create a detailed, vivid description suitable for ${mode} generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`
       
       const enhancedPrompt = await window.spark.llm(promptText, 'gpt-4o-mini')
+
+      setGenerationStage('Processing reference images...')
+      setGenerationProgress(30)
+      await new Promise(resolve => setTimeout(resolve, 600))
+
+      setGenerationStage(`Generating ${mode}...`)
+      setGenerationProgress(45)
+      
+      const stages = mode === 'image' 
+        ? [
+            { stage: 'Creating base composition...', progress: 55, delay: 500 },
+            { stage: 'Applying style and details...', progress: 70, delay: 600 },
+            { stage: 'Refining colors and lighting...', progress: 85, delay: 500 },
+            { stage: 'Final touches...', progress: 95, delay: 400 }
+          ]
+        : [
+            { stage: 'Generating keyframes...', progress: 55, delay: 700 },
+            { stage: 'Animating motion...', progress: 65, delay: 800 },
+            { stage: 'Rendering frames...', progress: 75, delay: 900 },
+            { stage: 'Processing effects...', progress: 85, delay: 700 },
+            { stage: 'Finalizing video...', progress: 95, delay: 600 }
+          ]
+
+      for (const { stage, progress, delay } of stages) {
+        setGenerationStage(stage)
+        setGenerationProgress(progress)
+        
+        if (mode === 'image' && progress >= 70) {
+          const seed = Date.now()
+          setPreviewUrl(`https://picsum.photos/seed/${seed}/400/300?blur=${Math.max(0, 10 - (progress - 70) / 3)}`)
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
 
       const mockUrl = mode === 'image' 
         ? `https://picsum.photos/seed/${Date.now()}/800/600`
         : `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
 
-      await new Promise(resolve => setTimeout(resolve, mode === 'image' ? 2000 : 4000))
+      setGenerationProgress(100)
+      setGenerationStage('Complete!')
+      setPreviewUrl(mockUrl)
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       const newItem: MediaItem = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -421,7 +469,12 @@ function App() {
       toast.error('Generation failed. Please try again.')
       console.error(error)
     } finally {
-      setIsGenerating(false)
+      setTimeout(() => {
+        setIsGenerating(false)
+        setGenerationProgress(0)
+        setGenerationStage('')
+        setPreviewUrl(null)
+      }, 1000)
     }
   }
 
@@ -905,19 +958,12 @@ function App() {
             </Card>
 
             {isGenerating && (
-              <Card className="p-6 shimmer">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="animate-pulse">
-                      <Sparkle weight="fill" className="text-primary" size={24} />
-                    </div>
-                    <div>
-                      <p className="font-medium">Creating your {mode}...</p>
-                      <p className="text-sm text-muted-foreground">This may take a moment</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
+              <GenerationProgress
+                mode={mode}
+                progress={generationProgress}
+                stage={generationStage}
+                previewUrl={previewUrl}
+              />
             )}
           </div>
 
