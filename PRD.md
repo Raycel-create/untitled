@@ -13,11 +13,25 @@ An AI-powered creative studio that generates stunning images and videos from tex
 ## Essential Features
 
 ### Text-to-Image Generation
-- **Functionality**: User enters text prompt, AI generates corresponding image
-- **Purpose**: Enable quick visual ideation and artistic exploration
+- **Functionality**: User enters text prompt, optionally selects style preset and applies editing tools to reference images, AI generates corresponding image
+- **Purpose**: Enable quick visual ideation and artistic exploration with creative control
 - **Trigger**: User types prompt and clicks "Generate Image" button
-- **Progression**: Enter prompt → Click generate → Loading state with progress → Image reveals → Auto-saves to gallery → Option to regenerate or create new
+- **Progression**: Enter prompt → (Optional) Select style preset → (Optional) Edit reference images with tools → Click generate → Loading state with progress → Image reveals → Auto-saves to gallery → Option to regenerate or create new
 - **Success criteria**: Images appear within 10 seconds, full resolution, properly formatted
+
+### Style Presets
+- **Functionality**: Quick-select predefined artistic styles that modify generation parameters
+- **Purpose**: Enable rapid experimentation with different aesthetics without complex prompting
+- **Trigger**: User clicks style preset chip
+- **Progression**: Browse preset options → Click desired style → Visual indicator shows selection → Style automatically applied to next generation
+- **Success criteria**: Presets visually distinct, apply instantly, clear selected state
+
+### Image Editing Tools
+- **Functionality**: Basic editing controls for reference images (crop, rotate, flip, brightness, contrast, blur)
+- **Purpose**: Allow users to prepare and optimize reference images before generation
+- **Trigger**: User clicks edit button on reference image thumbnail
+- **Progression**: Upload reference → Click edit icon → Editor modal opens → Apply adjustments with sliders/buttons → Preview updates in real-time → Save or cancel → Edited image used in generation
+- **Success criteria**: Edits apply smoothly, preview updates instantly, changes persist until regeneration
 
 ### Text-to-Video Generation
 - **Functionality**: User enters text prompt, AI generates short video clip
@@ -46,6 +60,13 @@ An AI-powered creative studio that generates stunning images and videos from tex
 - **Trigger**: User clicks mode toggle tabs
 - **Progression**: Select mode → UI updates with mode-specific prompt suggestions → Generate appropriate media type → Gallery filters to show current mode
 - **Success criteria**: Instant mode switching, no state loss, clear visual distinction
+
+### Multiple Reference Images
+- **Functionality**: Upload up to 5 reference images via drag-drop, paste, or file selection
+- **Purpose**: Provide AI with multiple visual references for better style and composition guidance
+- **Trigger**: User uploads images to reference section
+- **Progression**: Click/drop/paste images → Thumbnails appear → Edit or remove individual images → Used collectively during generation
+- **Success criteria**: Smooth upload, clear visual feedback, max 5 enforced gracefully
 
 ## Edge Case Handling
 
@@ -105,15 +126,19 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Textarea for prompt input with character counter
   - Button for generate actions with loading states
   - Card for gallery items with hover effects
-  - Dialog for fullscreen media preview
+  - Dialog for fullscreen media preview and image editing
   - Progress indicator during generation
-  - Badge for media type labels
+  - Badge for media type labels and style presets
   - Separator for visual section breaks
+  - Slider for image adjustment controls (brightness, contrast, blur)
+  - Toggle buttons for image transformations (flip, rotate)
 - **Customizations**: 
   - Custom video player controls overlay
   - Gradient overlays on gallery thumbnails for text readability
   - Shimmer loading effect for generation states
   - Custom scrollbar styling for gallery area
+  - Canvas-based image editor with real-time preview
+  - Chip-style style preset selector with visual indicators
 - **States**: 
   - Generate button: default → loading (with spinner) → success
   - Gallery items: default → hover (lift + glow) → selected (modal open)

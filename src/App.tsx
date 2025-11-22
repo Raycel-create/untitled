@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card } from '@/components/ui/card'
@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload } from '@phosphor-icons/react'
+import { Slider } from '@/components/ui/slider'
+import { Separator } from '@/components/ui/separator'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
 type MediaType = 'image' | 'video'
@@ -19,6 +21,38 @@ interface MediaItem {
   createdAt: number
 }
 
+interface StylePreset {
+  id: string
+  name: string
+  description: string
+  promptModifier: string
+}
+
+interface ImageAdjustments {
+  brightness: number
+  contrast: number
+  blur: number
+  rotation: number
+  flipH: boolean
+}
+
+interface ReferenceImage {
+  original: string
+  edited?: string
+  adjustments: ImageAdjustments
+}
+
+const stylePresets: StylePreset[] = [
+  { id: 'photorealistic', name: 'Photorealistic', description: 'Lifelike photography', promptModifier: 'photorealistic, 8K, ultra detailed, professional photography' },
+  { id: 'artistic', name: 'Artistic', description: 'Painterly and expressive', promptModifier: 'artistic painting, vibrant colors, expressive brushstrokes, fine art' },
+  { id: 'cinematic', name: 'Cinematic', description: 'Movie-quality visuals', promptModifier: 'cinematic lighting, dramatic composition, film grain, anamorphic' },
+  { id: 'anime', name: 'Anime', description: 'Japanese animation style', promptModifier: 'anime style, cel shaded, vibrant colors, detailed linework' },
+  { id: 'minimalist', name: 'Minimalist', description: 'Clean and simple', promptModifier: 'minimalist design, clean lines, simple composition, negative space' },
+  { id: 'surreal', name: 'Surreal', description: 'Dreamlike and abstract', promptModifier: 'surreal art, dreamlike, abstract, otherworldly, imaginative' },
+  { id: 'vintage', name: 'Vintage', description: 'Retro aesthetic', promptModifier: 'vintage photography, retro colors, film grain, nostalgic' },
+  { id: '3d-render', name: '3D Render', description: 'Computer graphics', promptModifier: '3D render, octane render, ray tracing, photorealistic CGI' },
+]
+
 function App() {
   const [mode, setMode] = useState<MediaType>('image')
   const [prompt, setPrompt] = useState('')
@@ -26,10 +60,57 @@ function App() {
   const [gallery, setGallery] = useKV<MediaItem[]>('ai-creator-gallery', [])
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [referenceImages, setReferenceImages] = useState<string[]>([])
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([])
+  const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null)
+  const [tempAdjustments, setTempAdjustments] = useState<ImageAdjustments>({
+    brightness: 100,
+    contrast: 100,
+    blur: 0,
+    rotation: 0,
+    flipH: false,
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
+
+  useEffect(() => {
+    if (editingImageIndex !== null && canvasRef.current) {
+      applyAdjustmentsToCanvas()
+    }
+  }, [tempAdjustments, editingImageIndex])
+
+  const applyAdjustmentsToCanvas = () => {
+    if (editingImageIndex === null || !canvasRef.current) return
+    
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.src = referenceImages[editingImageIndex].original
+    
+    img.onload = () => {
+      canvas.width = img.width
+      canvas.height = img.height
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.save()
+      
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      ctx.rotate((tempAdjustments.rotation * Math.PI) / 180)
+      if (tempAdjustments.flipH) {
+        ctx.scale(-1, 1)
+      }
+      ctx.translate(-canvas.width / 2, -canvas.height / 2)
+      
+      ctx.filter = `brightness(${tempAdjustments.brightness}%) contrast(${tempAdjustments.contrast}%) blur(${tempAdjustments.blur}px)`
+      ctx.drawImage(img, 0, 0)
+      ctx.restore()
+    }
+  }
 
   const handleImageUpload = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -44,7 +125,17 @@ function App() {
 
     const reader = new FileReader()
     reader.onload = (e) => {
-      setReferenceImages(prev => [...prev, e.target?.result as string])
+      const imageUrl = e.target?.result as string
+      setReferenceImages(prev => [...prev, {
+        original: imageUrl,
+        adjustments: {
+          brightness: 100,
+          contrast: 100,
+          blur: 0,
+          rotation: 0,
+          flipH: false,
+        }
+      }])
       toast.success('Reference image added')
     }
     reader.readAsDataURL(file)
@@ -98,6 +189,51 @@ function App() {
     toast.success('Reference image removed')
   }
 
+  const openImageEditor = (index: number) => {
+    const img = referenceImages[index]
+    setEditingImageIndex(index)
+    setTempAdjustments(img.adjustments)
+  }
+
+  const saveImageEdits = () => {
+    if (editingImageIndex === null || !canvasRef.current) return
+    
+    const editedUrl = canvasRef.current.toDataURL('image/png')
+    setReferenceImages(prev => prev.map((img, idx) => 
+      idx === editingImageIndex 
+        ? { ...img, edited: editedUrl, adjustments: tempAdjustments }
+        : img
+    ))
+    setEditingImageIndex(null)
+    toast.success('Image edits saved')
+  }
+
+  const cancelImageEdits = () => {
+    setEditingImageIndex(null)
+    setTempAdjustments({
+      brightness: 100,
+      contrast: 100,
+      blur: 0,
+      rotation: 0,
+      flipH: false,
+    })
+  }
+
+  const resetImageEdits = (index: number) => {
+    setReferenceImages(prev => prev.map((img, idx) => 
+      idx === index 
+        ? { ...img, edited: undefined, adjustments: {
+            brightness: 100,
+            contrast: 100,
+            blur: 0,
+            rotation: 0,
+            flipH: false,
+          }}
+        : img
+    ))
+    toast.success('Image reset to original')
+  }
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error('Please enter a prompt')
@@ -107,7 +243,16 @@ function App() {
     setIsGenerating(true)
 
     try {
-      const promptText = `You are an AI art director. Based on this user prompt: "${prompt}", create a detailed, vivid description suitable for image generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`
+      let finalPrompt = prompt
+      
+      if (selectedStyle) {
+        const preset = stylePresets.find(p => p.id === selectedStyle)
+        if (preset) {
+          finalPrompt = `${prompt}, ${preset.promptModifier}`
+        }
+      }
+
+      const promptText = `You are an AI art director. Based on this user prompt: "${finalPrompt}", create a detailed, vivid description suitable for image generation. Include specific details about style, lighting, composition, colors, and mood. Keep it under 100 words but make it highly descriptive and evocative.`
       
       const enhancedPrompt = await window.spark.llm(promptText, 'gpt-4o-mini')
 
@@ -129,6 +274,7 @@ function App() {
       
       toast.success(`${mode === 'image' ? 'Image' : 'Video'} generated successfully!`)
       setPrompt('')
+      setSelectedStyle(null)
     } catch (error) {
       toast.error('Generation failed. Please try again.')
       console.error(error)
@@ -215,16 +361,34 @@ function App() {
                           key={index}
                           className="relative w-20 h-20 border-2 border-border rounded-lg overflow-hidden group"
                         >
-                          <img src={img} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeReferenceImage(index)
-                            }}
-                            className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                          >
-                            <X size={12} weight="bold" />
-                          </button>
+                          <img src={img.edited || img.original} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openImageEditor(index)
+                              }}
+                              className="bg-primary text-primary-foreground rounded-full p-1.5 hover:scale-110 transition-transform"
+                              title="Edit image"
+                            >
+                              <PencilSimple size={14} weight="bold" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeReferenceImage(index)
+                              }}
+                              className="bg-destructive text-destructive-foreground rounded-full p-1.5 hover:scale-110 transition-transform"
+                              title="Remove image"
+                            >
+                              <X size={14} weight="bold" />
+                            </button>
+                          </div>
+                          {img.edited && (
+                            <Badge className="absolute top-1 right-1 px-1 py-0 text-[10px] h-4">
+                              <PencilSimple size={10} weight="fill" />
+                            </Badge>
+                          )}
                         </div>
                       ))}
                       {referenceImages.length < 5 && (
@@ -239,6 +403,35 @@ function App() {
                         </div>
                       )}
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Style Presets
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {stylePresets.map((preset) => (
+                        <Badge
+                          key={preset.id}
+                          variant={selectedStyle === preset.id ? "default" : "outline"}
+                          className={`cursor-pointer transition-all hover:scale-105 ${
+                            selectedStyle === preset.id 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'hover:bg-primary/10'
+                          }`}
+                          onClick={() => setSelectedStyle(selectedStyle === preset.id ? null : preset.id)}
+                        >
+                          {selectedStyle === preset.id && (
+                            <Check size={12} weight="bold" className="mr-1" />
+                          )}
+                          {preset.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    {selectedStyle && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {stylePresets.find(p => p.id === selectedStyle)?.description}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -311,16 +504,34 @@ function App() {
                           key={index}
                           className="relative w-20 h-20 border-2 border-border rounded-lg overflow-hidden group"
                         >
-                          <img src={img} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeReferenceImage(index)
-                            }}
-                            className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                          >
-                            <X size={12} weight="bold" />
-                          </button>
+                          <img src={img.edited || img.original} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openImageEditor(index)
+                              }}
+                              className="bg-accent text-accent-foreground rounded-full p-1.5 hover:scale-110 transition-transform"
+                              title="Edit image"
+                            >
+                              <PencilSimple size={14} weight="bold" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeReferenceImage(index)
+                              }}
+                              className="bg-destructive text-destructive-foreground rounded-full p-1.5 hover:scale-110 transition-transform"
+                              title="Remove image"
+                            >
+                              <X size={14} weight="bold" />
+                            </button>
+                          </div>
+                          {img.edited && (
+                            <Badge className="absolute top-1 right-1 px-1 py-0 text-[10px] h-4">
+                              <PencilSimple size={10} weight="fill" />
+                            </Badge>
+                          )}
                         </div>
                       ))}
                       {referenceImages.length < 5 && (
@@ -504,6 +715,140 @@ function App() {
                   <Trash weight="bold" />
                   Delete
                 </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingImageIndex !== null} onOpenChange={() => cancelImageEdits()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PencilSimple weight="fill" />
+              Edit Reference Image
+            </DialogTitle>
+          </DialogHeader>
+          {editingImageIndex !== null && (
+            <div className="space-y-6">
+              <div className="rounded-lg overflow-hidden bg-muted flex items-center justify-center p-4">
+                <canvas 
+                  ref={canvasRef}
+                  className="max-w-full max-h-[400px] w-auto h-auto"
+                />
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Brightness: {tempAdjustments.brightness}%
+                  </label>
+                  <Slider
+                    value={[tempAdjustments.brightness]}
+                    onValueChange={(v) => setTempAdjustments(prev => ({ ...prev, brightness: v[0] }))}
+                    min={0}
+                    max={200}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Contrast: {tempAdjustments.contrast}%
+                  </label>
+                  <Slider
+                    value={[tempAdjustments.contrast]}
+                    onValueChange={(v) => setTempAdjustments(prev => ({ ...prev, contrast: v[0] }))}
+                    min={0}
+                    max={200}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Blur: {tempAdjustments.blur}px
+                  </label>
+                  <Slider
+                    value={[tempAdjustments.blur]}
+                    onValueChange={(v) => setTempAdjustments(prev => ({ ...prev, blur: v[0] }))}
+                    min={0}
+                    max={10}
+                    step={0.5}
+                    className="w-full"
+                  />
+                </div>
+
+                <Separator />
+
+                <div>
+                  <label className="text-sm font-medium mb-3 block">
+                    Transformations
+                  </label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTempAdjustments(prev => ({ ...prev, flipH: !prev.flipH }))}
+                      className={tempAdjustments.flipH ? 'bg-primary/10' : ''}
+                    >
+                      <FlipHorizontal weight="bold" className="mr-2" />
+                      Flip Horizontal
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTempAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 90) % 360 }))}
+                    >
+                      <ArrowsClockwise weight="bold" className="mr-2" />
+                      Rotate 90°
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTempAdjustments(prev => ({ ...prev, rotation: (prev.rotation - 90 + 360) % 360 }))}
+                    >
+                      <ArrowCounterClockwise weight="bold" className="mr-2" />
+                      Rotate -90°
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTempAdjustments({
+                        brightness: 100,
+                        contrast: 100,
+                        blur: 0,
+                        rotation: 0,
+                        flipH: false,
+                      })
+                    }}
+                    className="flex-1"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={cancelImageEdits}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveImageEdits}
+                    className="flex-1 gap-2"
+                  >
+                    <Check weight="bold" />
+                    Save Changes
+                  </Button>
+                </div>
               </div>
             </div>
           )}
