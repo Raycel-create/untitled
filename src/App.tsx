@@ -8,8 +8,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { AIAssistant } from '@/components/AIAssistant'
+import { SubscriptionModal } from '@/components/SubscriptionModal'
+import { UsageIndicator } from '@/components/UsageIndicator'
+import { 
+  initializeSubscription, 
+  resetMonthlyUsage, 
+  canGenerate, 
+  shouldShowUpgradePrompt,
+  SUBSCRIPTION_LIMITS,
+  type SubscriptionStatus 
+} from '@/lib/subscription'
 
 type MediaType = 'image' | 'video'
 
@@ -70,10 +81,22 @@ function App() {
     rotation: 0,
     flipH: false,
   })
+  const [subscriptionStatus, setSubscriptionStatus] = useKV<SubscriptionStatus>(
+    'subscription-status',
+    initializeSubscription()
+  )
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [upgradeReason, setUpgradeReason] = useState<'limit_reached' | 'video_locked' | 'upgrade_prompt'>('upgrade_prompt')
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
+
+  useEffect(() => {
+    setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
+  }, [])
 
   useEffect(() => {
     if (editingImageIndex !== null && canvasRef.current) {
@@ -118,8 +141,17 @@ function App() {
       return
     }
 
-    if (referenceImages.length >= 5) {
-      toast.error('Maximum 5 reference images allowed')
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+    const maxImages = currentStatus.tier === 'pro' 
+      ? SUBSCRIPTION_LIMITS.pro.maxReferenceImages 
+      : SUBSCRIPTION_LIMITS.free.maxReferenceImages
+
+    if (referenceImages.length >= maxImages) {
+      toast.error(`Maximum ${maxImages} reference images allowed${currentStatus.tier === 'free' ? ' on free tier' : ''}`)
+      if (currentStatus.tier === 'free') {
+        setUpgradeReason('upgrade_prompt')
+        setUpgradeModalOpen(true)
+      }
       return
     }
 
@@ -150,7 +182,12 @@ function App() {
       return
     }
 
-    const availableSlots = 5 - referenceImages.length
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+    const maxImages = currentStatus.tier === 'pro' 
+      ? SUBSCRIPTION_LIMITS.pro.maxReferenceImages 
+      : SUBSCRIPTION_LIMITS.free.maxReferenceImages
+
+    const availableSlots = maxImages - referenceImages.length
     if (files.length > availableSlots) {
       toast.error(`Can only add ${availableSlots} more image(s)`)
     }
@@ -173,8 +210,13 @@ function App() {
     const files = e.target.files
     if (!files) return
 
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+    const maxImages = currentStatus.tier === 'pro' 
+      ? SUBSCRIPTION_LIMITS.pro.maxReferenceImages 
+      : SUBSCRIPTION_LIMITS.free.maxReferenceImages
+
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
-    const availableSlots = 5 - referenceImages.length
+    const availableSlots = maxImages - referenceImages.length
     
     if (imageFiles.length > availableSlots) {
       toast.error(`Can only add ${availableSlots} more image(s)`)
@@ -240,6 +282,20 @@ function App() {
       return
     }
 
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+
+    if (mode === 'video' && !SUBSCRIPTION_LIMITS[currentStatus.tier].features.videoGeneration) {
+      setUpgradeReason('video_locked')
+      setUpgradeModalOpen(true)
+      return
+    }
+
+    if (!canGenerate(currentStatus)) {
+      setUpgradeReason('limit_reached')
+      setUpgradeModalOpen(true)
+      return
+    }
+
     setIsGenerating(true)
 
     try {
@@ -271,10 +327,25 @@ function App() {
       }
 
       setGallery(current => [...(current ?? []), newItem])
+
+      setSubscriptionStatus(current => {
+        const updated = current ?? initializeSubscription()
+        return {
+          ...updated,
+          generationsUsed: updated.generationsUsed + 1
+        }
+      })
       
       toast.success(`${mode === 'image' ? 'Image' : 'Video'} generated successfully!`)
       setPrompt('')
       setSelectedStyle(null)
+
+      if (shouldShowUpgradePrompt(currentStatus)) {
+        setTimeout(() => {
+          setUpgradeReason('upgrade_prompt')
+          setUpgradeModalOpen(true)
+        }, 1500)
+      }
     } catch (error) {
       toast.error('Generation failed. Please try again.')
       console.error(error)
@@ -297,26 +368,87 @@ function App() {
     toast.success('Download started')
   }
 
+  const handleUpgrade = () => {
+    setSubscriptionStatus(current => ({
+      ...(current ?? initializeSubscription()),
+      tier: 'pro',
+      generationsLimit: null
+    }))
+    setUpgradeModalOpen(false)
+    toast.success('🎉 Welcome to Pro! Enjoy unlimited access.')
+  }
+
+  const handleModeChange = (newMode: string) => {
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+    
+    if (newMode === 'video' && !SUBSCRIPTION_LIMITS[currentStatus.tier].features.videoGeneration) {
+      setUpgradeReason('video_locked')
+      setUpgradeModalOpen(true)
+      return
+    }
+    
+    setMode(newMode as MediaType)
+  }
+
+  const currentStatus = subscriptionStatus ?? initializeSubscription()
+  const maxReferenceImages = currentStatus.tier === 'pro' 
+    ? SUBSCRIPTION_LIMITS.pro.maxReferenceImages 
+    : SUBSCRIPTION_LIMITS.free.maxReferenceImages
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight mb-2">AI Creator Studio</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">AI Creator Studio</h1>
+              {currentStatus.tier === 'pro' && (
+                <Badge className="bg-gradient-to-r from-primary to-accent text-white gap-1">
+                  <Crown weight="fill" size={14} />
+                  Pro
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setAssistantOpen(true)}
+              className="relative"
+              title="AI Assistant"
+            >
+              <ChatCircleDots weight="fill" size={20} />
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+              </span>
+            </Button>
+          </div>
           <p className="text-muted-foreground">Generate stunning images and videos with AI</p>
         </header>
 
         <div className="grid lg:grid-cols-[400px_1fr] gap-8">
           <div className="space-y-6">
+            <UsageIndicator 
+              subscriptionStatus={currentStatus}
+              onUpgradeClick={() => {
+                setUpgradeReason('upgrade_prompt')
+                setUpgradeModalOpen(true)
+              }}
+            />
+
             <Card className="p-6">
-              <Tabs value={mode} onValueChange={(v) => setMode(v as MediaType)}>
+              <Tabs value={mode} onValueChange={handleModeChange}>
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="image" className="gap-2">
                     <ImageIcon weight="fill" />
                     Image
                   </TabsTrigger>
-                  <TabsTrigger value="video" className="gap-2">
+                  <TabsTrigger value="video" className="gap-2 relative">
                     <VideoCamera weight="fill" />
                     Video
+                    {currentStatus.tier === 'free' && (
+                      <Crown weight="fill" className="absolute -top-1 -right-1 text-primary" size={14} />
+                    )}
                   </TabsTrigger>
                 </TabsList>
 
@@ -341,7 +473,7 @@ function App() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium">
-                        Reference Images {referenceImages.length > 0 && `(${referenceImages.length}/5)`}
+                        Reference Images {referenceImages.length > 0 && `(${referenceImages.length}/${maxReferenceImages})`}
                       </label>
                       {referenceImages.length > 0 && (
                         <button
@@ -391,7 +523,7 @@ function App() {
                           )}
                         </div>
                       ))}
-                      {referenceImages.length < 5 && (
+                      {referenceImages.length < maxReferenceImages && (
                         <div
                           className="w-20 h-20 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
                           onDrop={handleDrop}
@@ -484,7 +616,7 @@ function App() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium">
-                        Reference Images {referenceImages.length > 0 && `(${referenceImages.length}/5)`}
+                        Reference Images {referenceImages.length > 0 && `(${referenceImages.length}/${maxReferenceImages})`}
                       </label>
                       {referenceImages.length > 0 && (
                         <button
@@ -534,7 +666,7 @@ function App() {
                           )}
                         </div>
                       ))}
-                      {referenceImages.length < 5 && (
+                      {referenceImages.length < maxReferenceImages && (
                         <div
                           className="w-20 h-20 border-2 border-dashed border-border rounded-lg hover:border-accent transition-colors cursor-pointer flex items-center justify-center bg-muted/30"
                           onDrop={handleDrop}
@@ -854,6 +986,22 @@ function App() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AIAssistant
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        currentPrompt={prompt}
+        onApplyPrompt={(newPrompt) => setPrompt(newPrompt)}
+        mode={mode}
+      />
+
+      <SubscriptionModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+        onUpgrade={handleUpgrade}
+        subscriptionStatus={currentStatus}
+        reason={upgradeReason}
+      />
     </div>
   )
 }

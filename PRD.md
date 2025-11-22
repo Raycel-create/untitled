@@ -68,6 +68,20 @@ An AI-powered creative studio that generates stunning images and videos from tex
 - **Progression**: Click/drop/paste images → Thumbnails appear → Edit or remove individual images → Used collectively during generation
 - **Success criteria**: Smooth upload, clear visual feedback, max 5 enforced gracefully
 
+### Subscription Tiers (Free vs Pro)
+- **Functionality**: Two-tier system with usage limits on free tier and unlimited access on pro tier
+- **Purpose**: Monetize while providing value at both levels, encourage upgrades for power users
+- **Trigger**: User reaches free tier limits or clicks upgrade prompt
+- **Progression**: Generate content → Track usage → Show limit warnings at 80% → Block at 100% with upgrade modal → Click upgrade → Payment flow (simulated) → Pro features unlocked immediately
+- **Success criteria**: Limits enforced accurately, upgrade path clear and frictionless, pro features activate instantly
+
+### 24/7 AI Assistant
+- **Functionality**: Persistent chat assistant that helps with prompts, explains features, troubleshoots issues
+- **Purpose**: Reduce friction, improve prompt quality, provide contextual help without leaving the app
+- **Trigger**: Click assistant icon (always visible) or automatic suggestions in key moments
+- **Progression**: Click assistant → Chat panel slides in → Ask question or accept suggestion → AI responds with specific help → Apply suggestions directly to prompt → Close or minimize assistant
+- **Success criteria**: Responses relevant and helpful, appears within 2 seconds, maintains conversation context, unobtrusive when not needed
+
 ## Edge Case Handling
 
 - **Generation Failures**: Show clear error message with retry option, don't lose prompt text
@@ -76,6 +90,9 @@ An AI-powered creative studio that generates stunning images and videos from tex
 - **Slow Generations**: Show engaging loading states with time estimates
 - **Storage Limits**: Graceful handling if gallery grows large, oldest items managed appropriately
 - **Network Issues**: Detect connectivity problems, show appropriate messaging
+- **Free Tier Limit Reached**: Clear messaging about upgrade benefits, don't block access to existing content
+- **Assistant Unavailable**: Graceful degradation if AI service fails, show cached suggestions
+- **Subscription Status Sync**: Handle edge cases where payment succeeds but status doesn't update immediately
 
 ## Design Direction
 
@@ -128,10 +145,12 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Card for gallery items with hover effects
   - Dialog for fullscreen media preview and image editing
   - Progress indicator during generation
-  - Badge for media type labels and style presets
+  - Badge for media type labels, style presets, and subscription tier
   - Separator for visual section breaks
   - Slider for image adjustment controls (brightness, contrast, blur)
   - Toggle buttons for image transformations (flip, rotate)
+  - Sheet (sliding panel) for AI assistant chat interface
+  - Alert for usage limit warnings and upgrade prompts
 - **Customizations**: 
   - Custom video player controls overlay
   - Gradient overlays on gallery thumbnails for text readability
@@ -152,6 +171,10 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Trash (Phosphor) for delete actions
   - X (Phosphor) for modal close
   - Play/Pause (Phosphor) for video controls
+  - ChatCircleDots (Phosphor) for AI assistant
+  - Crown (Phosphor) for pro tier badge
+  - Lightning (Phosphor) for upgrade prompts
+  - Question (Phosphor) for help hints
 - **Spacing**: 
   - Container: max-w-7xl mx-auto with px-4 sm:px-6 lg:px-8
   - Sections: gap-8 between major sections
