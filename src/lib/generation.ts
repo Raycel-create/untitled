@@ -10,6 +10,7 @@ export type ProgressCallback = (update: GenerationProgress) => void
 
 export interface GenerationOptions {
   referenceImage?: string
+  referenceVideo?: string
   strength?: number
   numOutputs?: number
 }
@@ -112,15 +113,16 @@ export async function generateVideo(
   prompt: string,
   apiKeys: APIKeys,
   provider: keyof APIKeys,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
+  options?: GenerationOptions
 ): Promise<string> {
   onProgress({ progress: 10, stage: 'Initializing video generation...' })
 
   switch (provider) {
     case 'runwayml':
-      return await generateWithRunwayML(prompt, apiKeys.runwayml!, onProgress)
+      return await generateWithRunwayML(prompt, apiKeys.runwayml!, onProgress, options)
     case 'replicate':
-      return await generateVideoWithReplicate(prompt, apiKeys.replicate!, onProgress)
+      return await generateVideoWithReplicate(prompt, apiKeys.replicate!, onProgress, options)
     default:
       throw new Error(`Unsupported provider: ${provider}`)
   }
@@ -348,9 +350,42 @@ async function generateImageWithReplicate(
 async function generateVideoWithReplicate(
   prompt: string,
   apiKey: string,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
+  options?: GenerationOptions
 ): Promise<string> {
   onProgress({ progress: 20, stage: 'Connecting to Replicate...' })
+
+  const input: any = {
+    prompt: prompt,
+    num_frames: 24,
+    num_inference_steps: 50
+  }
+
+  let version = 'anotherjesse/zeroscope-v2-xl:9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351'
+
+  if (options?.referenceVideo) {
+    version = 'stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438'
+    input.video = options.referenceVideo
+    input.cond_aug = 0.02
+    input.decoding_t = 14
+    input.motion_bucket_id = 127
+    input.frames_per_second = 6
+    
+    if (options.strength !== undefined) {
+      input.motion_bucket_id = Math.round(options.strength * 255)
+    }
+  } else if (options?.referenceImage) {
+    version = 'stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438'
+    input.image = options.referenceImage
+    input.cond_aug = 0.02
+    input.decoding_t = 14
+    input.motion_bucket_id = 127
+    input.frames_per_second = 6
+    
+    if (options.strength !== undefined) {
+      input.motion_bucket_id = Math.round(options.strength * 255)
+    }
+  }
 
   const response = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
@@ -359,12 +394,8 @@ async function generateVideoWithReplicate(
       'Authorization': `Token ${apiKey}`
     },
     body: JSON.stringify({
-      version: 'anotherjesse/zeroscope-v2-xl:9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351',
-      input: {
-        prompt: prompt,
-        num_frames: 24,
-        num_inference_steps: 50
-      }
+      version: version,
+      input: input
     })
   })
 
@@ -375,7 +406,14 @@ async function generateVideoWithReplicate(
 
   const prediction = await response.json()
   
-  onProgress({ progress: 40, stage: 'Generating video frames...' })
+  onProgress({ 
+    progress: 40, 
+    stage: options?.referenceVideo 
+      ? 'Transforming video...' 
+      : options?.referenceImage 
+        ? 'Animating image...' 
+        : 'Generating video frames...' 
+  })
   
   const videoUrl = await pollReplicatePrediction(prediction.id, apiKey, onProgress, true)
   
@@ -387,9 +425,33 @@ async function generateVideoWithReplicate(
 async function generateWithRunwayML(
   prompt: string,
   apiKey: string,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
+  options?: GenerationOptions
 ): Promise<string> {
   onProgress({ progress: 20, stage: 'Connecting to RunwayML...' })
+
+  const payload: any = {
+    model: 'gen2',
+    prompt: prompt,
+    duration: 4,
+    resolution: '1280x768'
+  }
+
+  if (options?.referenceVideo) {
+    payload.init_video = options.referenceVideo
+    payload.interpolate = true
+    payload.upscale = false
+    
+    if (options.strength !== undefined) {
+      payload.init_video_strength = 1 - options.strength
+    }
+  } else if (options?.referenceImage) {
+    payload.init_image = options.referenceImage
+    
+    if (options.strength !== undefined) {
+      payload.init_image_strength = 1 - options.strength
+    }
+  }
 
   const response = await fetch('https://api.runwayml.com/v1/generate', {
     method: 'POST',
@@ -397,12 +459,7 @@ async function generateWithRunwayML(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify({
-      model: 'gen2',
-      prompt: prompt,
-      duration: 4,
-      resolution: '1280x768'
-    })
+    body: JSON.stringify(payload)
   })
 
   if (!response.ok) {
@@ -413,7 +470,10 @@ async function generateWithRunwayML(
   const data = await response.json()
   const taskId = data.id
 
-  onProgress({ progress: 40, stage: 'Generating video...' })
+  onProgress({ 
+    progress: 40, 
+    stage: options?.referenceVideo ? 'Transforming video...' : 'Generating video...' 
+  })
   
   const videoUrl = await pollRunwayMLTask(taskId, apiKey, onProgress)
   

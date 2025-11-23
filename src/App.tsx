@@ -74,6 +74,11 @@ interface ReferenceImage {
   adjustments: ImageAdjustments
 }
 
+interface ReferenceVideo {
+  url: string
+  thumbnail?: string
+}
+
 const stylePresets: StylePreset[] = [
   { id: 'photorealistic', name: 'Photorealistic', description: 'Lifelike photography', promptModifier: 'photorealistic, 8K, ultra detailed, professional photography' },
   { id: 'artistic', name: 'Artistic', description: 'Painterly and expressive', promptModifier: 'artistic painting, vibrant colors, expressive brushstrokes, fine art' },
@@ -98,6 +103,7 @@ function App() {
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([])
+  const [referenceVideos, setReferenceVideos] = useState<ReferenceVideo[]>([])
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null)
   const [tempAdjustments, setTempAdjustments] = useState<ImageAdjustments>({
@@ -109,6 +115,7 @@ function App() {
   })
   const [batchCount, setBatchCount] = useState(1)
   const [useImageToImage, setUseImageToImage] = useState(false)
+  const [useVideoToVideo, setUseVideoToVideo] = useState(false)
   const [transformStrength, setTransformStrength] = useState(0.75)
   const [isUpscaling, setIsUpscaling] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useKV<SubscriptionStatus>(
@@ -128,6 +135,7 @@ function App() {
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoFileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
@@ -240,6 +248,52 @@ function App() {
     reader.readAsDataURL(file)
   }
 
+  const handleVideoUpload = (file: File) => {
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please upload a video file')
+      return
+    }
+
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+    
+    if (currentStatus.tier === 'free') {
+      toast.error('Video-to-video transformation is a Pro feature')
+      setUpgradeReason('upgrade_prompt')
+      setUpgradeModalOpen(true)
+      return
+    }
+
+    const maxVideos = 1
+    if (referenceVideos.length >= maxVideos) {
+      toast.error('Maximum 1 reference video allowed')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const videoUrl = e.target?.result as string
+      
+      const video = document.createElement('video')
+      video.src = videoUrl
+      video.currentTime = 1
+      
+      video.onloadeddata = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(video, 0, 0)
+          const thumbnail = canvas.toDataURL('image/jpeg')
+          
+          setReferenceVideos(prev => [...prev, { url: videoUrl, thumbnail }])
+          toast.success('Reference video added')
+        }
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
@@ -292,10 +346,27 @@ function App() {
     imageFiles.slice(0, availableSlots).forEach(file => handleImageUpload(file))
   }
 
+  const handleVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const videoFiles = Array.from(files).filter(f => f.type.startsWith('video/'))
+    
+    if (videoFiles.length > 0) {
+      handleVideoUpload(videoFiles[0])
+    }
+  }
+
   const removeReferenceImage = (index: number) => {
     setReferenceImages(prev => prev.filter((_, i) => i !== index))
     if (fileInputRef.current) fileInputRef.current.value = ''
     toast.success('Reference image removed')
+  }
+
+  const removeReferenceVideo = (index: number) => {
+    setReferenceVideos(prev => prev.filter((_, i) => i !== index))
+    if (videoFileInputRef.current) videoFileInputRef.current.value = ''
+    toast.success('Reference video removed')
   }
 
   const openImageEditor = (index: number) => {
@@ -492,11 +563,24 @@ function App() {
           toast.success('Image generated successfully!')
         }
       } else {
+        const referenceVideoUrl = useVideoToVideo && referenceVideos.length > 0 
+          ? referenceVideos[0].url
+          : undefined
+        
+        const referenceImageUrl = !referenceVideoUrl && referenceImages.length > 0 
+          ? (referenceImages[0].edited || referenceImages[0].original)
+          : undefined
+
         const generatedUrl = await generateVideo(
           enhancedPrompt,
           apiKeys ?? {},
           provider,
-          progressCallback
+          progressCallback,
+          {
+            referenceVideo: referenceVideoUrl,
+            referenceImage: referenceImageUrl,
+            strength: transformStrength
+          }
         )
 
         setGenerationProgress(100)
@@ -1056,6 +1140,91 @@ function App() {
                       )}
                     </div>
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        Reference Video {referenceVideos.length > 0 && `(${referenceVideos.length}/1)`}
+                        {currentStatus.tier === 'free' && (
+                          <Crown weight="fill" className="text-primary" size={14} />
+                        )}
+                      </label>
+                      {referenceVideos.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setReferenceVideos([])
+                            if (videoFileInputRef.current) videoFileInputRef.current.value = ''
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {referenceVideos.map((vid, index) => (
+                        <div
+                          key={index}
+                          className="relative w-32 h-20 border-2 border-accent rounded-lg overflow-hidden group"
+                        >
+                          {vid.thumbnail ? (
+                            <img src={vid.thumbnail} alt={`Video ${index + 1}`} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-muted flex items-center justify-center">
+                              <VideoCamera size={24} className="text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeReferenceVideo(index)
+                              }}
+                              className="bg-destructive text-destructive-foreground rounded-full p-1.5 hover:scale-110 transition-transform"
+                              title="Remove video"
+                            >
+                              <X size={14} weight="bold" />
+                            </button>
+                          </div>
+                          <Badge className="absolute top-1 right-1 px-1 py-0 text-[10px] h-4 bg-accent">
+                            <VideoCamera size={10} weight="fill" />
+                          </Badge>
+                        </div>
+                      ))}
+                      {referenceVideos.length < 1 && (
+                        <div
+                          className="w-32 h-20 border-2 border-dashed border-accent rounded-lg hover:border-accent/70 transition-colors cursor-pointer flex flex-col items-center justify-center bg-accent/5 gap-1"
+                          onClick={() => videoFileInputRef.current?.click()}
+                          title="Add reference video (Pro feature)"
+                        >
+                          <VideoCamera size={24} className="text-accent" />
+                          <span className="text-[10px] text-muted-foreground">Upload Video</span>
+                        </div>
+                      )}
+                    </div>
+                    {currentStatus.tier === 'free' && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Video-to-video transformations are available on Pro plan
+                      </p>
+                    )}
+                  </div>
+                  {(referenceVideos.length > 0 || referenceImages.length > 0) && (
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Transformation Strength: {Math.round(transformStrength * 100)}%
+                      </label>
+                      <Slider
+                        value={[transformStrength]}
+                        onValueChange={(v) => setTransformStrength(v[0])}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Lower values preserve more of the original, higher values allow more creative freedom
+                      </p>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       onClick={handleGenerate}
@@ -1082,6 +1251,13 @@ function App() {
                     accept="image/*"
                     multiple
                     onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <input
+                    ref={videoFileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoFileSelect}
                     className="hidden"
                   />
                 </TabsContent>

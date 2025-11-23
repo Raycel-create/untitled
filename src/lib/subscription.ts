@@ -29,6 +29,7 @@ export const SUBSCRIPTION_LIMITS = {
       advancedBodyEditing: false,
       proFilters: false,
       imageToImage: true,
+      videoToVideo: false,
       batchGeneration: true,
       upscaling: false,
     }
@@ -49,6 +50,7 @@ export const SUBSCRIPTION_LIMITS = {
       advancedBodyEditing: true,
       proFilters: true,
       imageToImage: true,
+      videoToVideo: true,
       batchGeneration: true,
       upscaling: true,
     }

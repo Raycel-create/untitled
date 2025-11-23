@@ -20,9 +20,9 @@ const PRO_FEATURES = [
   { icon: Sparkle, text: 'Unlimited image generations' },
   { icon: VideoCamera, text: 'Unlimited video generations' },
   { icon: ImageIcon, text: 'Up to 5 reference images' },
-  { icon: Lightning, text: 'HD quality outputs' },
+  { icon: VideoCamera, text: 'Video-to-video transformations' },
+  { icon: Lightning, text: 'HD quality & 4x upscaling' },
   { icon: ChatCircleDots, text: 'Priority AI assistant' },
-  { icon: Crown, text: 'Early access to new features' },
 ]
 
 export function SubscriptionModal({ 
