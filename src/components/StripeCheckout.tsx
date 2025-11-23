@@ -11,6 +11,7 @@ interface StripeCheckoutProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   userEmail: string
+  userId: string
   onSuccess: () => void
   onConfigureStripe: () => void
 }
@@ -37,7 +38,7 @@ const PRICING_PLANS = [
   },
 ]
 
-export function StripeCheckout({ open, onOpenChange, userEmail, onSuccess, onConfigureStripe }: StripeCheckoutProps) {
+export function StripeCheckout({ open, onOpenChange, userEmail, userId, onSuccess, onConfigureStripe }: StripeCheckoutProps) {
   const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -59,6 +60,7 @@ export function StripeCheckout({ open, onOpenChange, userEmail, onSuccess, onCon
       const checkoutUrl = await createCheckoutSession(
         plan.priceId,
         userEmail,
+        userId,
         stripeConfig.publishableKey
       )
 

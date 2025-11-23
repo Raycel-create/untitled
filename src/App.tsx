@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand, Plugs } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -25,6 +25,7 @@ import { AdminLogin } from '@/components/AdminLogin'
 import { AdminSettings } from '@/components/AdminSettings'
 import { GenerationProgress } from '@/components/GenerationProgress'
 import { TemplateRecommendations } from '@/components/TemplateRecommendations'
+import { WebhookHandler } from '@/components/WebhookHandler'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -135,6 +136,7 @@ function App() {
   const [stripeConfigOpen, setStripeConfigOpen] = useState(false)
   const [stripeCheckoutOpen, setStripeCheckoutOpen] = useState(false)
   const [subscriptionManagementOpen, setSubscriptionManagementOpen] = useState(false)
+  const [webhookHandlerOpen, setWebhookHandlerOpen] = useState(false)
   const [adminSession, setAdminSession] = useKV<AdminSession>('admin-session', initializeAdminSession())
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
@@ -759,6 +761,30 @@ function App() {
     }))
   }
 
+  const handleWebhookSubscriptionUpdate = (userId: string, subscriptionData: any) => {
+    const currentUserId = authState?.user?.id || 'default-user'
+    
+    if (userId !== currentUserId) {
+      console.log('Webhook for different user, ignoring')
+      return
+    }
+
+    setSubscriptionStatus(current => ({
+      ...(current ?? initializeSubscription()),
+      tier: subscriptionData.status === 'active' ? 'pro' : 'free',
+      generationsLimit: subscriptionData.status === 'active' ? null : SUBSCRIPTION_LIMITS.free.generationsPerMonth,
+      stripeCustomerId: subscriptionData.customerId,
+      stripeSubscriptionId: subscriptionData.id,
+      stripeStatus: subscriptionData.status,
+      currentPeriodEnd: subscriptionData.currentPeriodEnd,
+      cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd
+    }))
+
+    toast.success('Subscription updated via webhook', {
+      description: `Status: ${subscriptionData.status}`
+    })
+  }
+
   const handleModeChange = (newMode: string) => {
     const currentStatus = subscriptionStatus ?? initializeSubscription()
     
@@ -818,6 +844,15 @@ function App() {
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
                   </span>
                 )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setWebhookHandlerOpen(true)}
+                className="relative"
+                title="Stripe Webhooks"
+              >
+                <Plugs weight="fill" size={20} />
               </Button>
               <Button
                 variant="outline"
@@ -1636,6 +1671,7 @@ function App() {
         open={stripeCheckoutOpen}
         onOpenChange={setStripeCheckoutOpen}
         userEmail={authState?.user?.email || ''}
+        userId={authState?.user?.id || 'default-user'}
         onSuccess={handlePaymentSuccess}
         onConfigureStripe={() => {
           setStripeCheckoutOpen(false)
@@ -1667,6 +1703,13 @@ function App() {
       <AdminSettings
         open={adminSettingsOpen}
         onOpenChange={setAdminSettingsOpen}
+      />
+
+      <WebhookHandler
+        open={webhookHandlerOpen}
+        onOpenChange={setWebhookHandlerOpen}
+        onSubscriptionUpdate={handleWebhookSubscriptionUpdate}
+        currentUserId={authState?.user?.id || 'default-user'}
       />
     </div>
   )

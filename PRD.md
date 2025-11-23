@@ -166,6 +166,15 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Progression**: Click assistant → Chat panel slides in → Ask question or accept suggestion → AI responds with specific help → Apply suggestions directly to prompt → Close or minimize assistant
 - **Success criteria**: Responses relevant and helpful, appears within 2 seconds, maintains conversation context, unobtrusive when not needed
 
+### Stripe Webhook Integration
+- **Functionality**: Real-time payment processing and subscription management via Stripe webhooks with manual testing interface and event logging
+- **Purpose**: Enable automatic subscription updates when payments succeed/fail, subscriptions renew/cancel, without requiring page refresh or manual status checks
+- **Trigger**: Stripe sends webhook events to the application endpoint or user manually processes webhooks via testing interface
+- **Progression**: 
+  - **Production**: Payment event occurs in Stripe → Webhook sent to endpoint → Event validated and processed → Subscription status updated in user's account → User sees updated status automatically
+  - **Testing**: User clicks webhooks icon → Opens webhook handler → Manually pastes webhook JSON or simulates event → Event processed → Subscription updated → Event logged for debugging
+- **Success criteria**: All webhook events process correctly (checkout.session.completed, customer.subscription.created/updated/deleted, invoice.payment_succeeded/failed), subscription status syncs accurately, webhook logs persist for debugging, manual testing interface works smoothly, no API keys required for open testing
+
 ## Edge Case Handling
 
 - **Unauthenticated Access**: Redirect to landing page, preserve no sensitive data
@@ -196,6 +205,12 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Network Issues**: Detect connectivity problems, show appropriate messaging
 - **Free Tier Limit Reached**: Clear messaging about upgrade benefits, don't block access to existing content
 - **Assistant Unavailable**: Graceful degradation if AI service fails, show cached suggestions
+- **Webhook Processing Failures**: Log all failures with detailed error messages, preserve webhook payload for retry, show clear error in UI
+- **Webhook Authentication Failures**: Validate webhook signature if secret configured, reject invalid webhooks, log security events
+- **Duplicate Webhook Events**: Handle event deduplication using event IDs, prevent double-processing of same subscription update
+- **Webhook for Different User**: Ignore webhooks not matching current user, log for debugging purposes
+- **Invalid Webhook Payload**: Validate JSON structure, show clear error messages, log malformed payloads for investigation
+- **Subscription Status Conflicts**: Handle cases where webhook arrives before/after manual status changes, prefer webhook as source of truth
 - **Recommendation Analysis Failures**: Fall back to keyword-based matching if AI analysis fails, show generic recommendations, allow manual template selection
 - **No Recommendations Found**: Clear messaging that prompt works well without templates, manual selection still available
 - **Recommendation Scoring Edge Cases**: Ensure scores between 0-100, handle ties gracefully, filter out Pro templates on free tier
@@ -301,6 +316,7 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Lightning (Phosphor) for CEO mode toggle and upgrade prompts
   - Question (Phosphor) for help hints
   - Key (Phosphor) for API key management
+  - Plugs (Phosphor) for webhook management
   - Eye/EyeSlash (Phosphor) for show/hide API keys
   - Check (Phosphor) for configured status
   - Info (Phosphor) for informational alerts

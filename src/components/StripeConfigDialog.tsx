@@ -16,7 +16,9 @@ interface StripeConfigDialogProps {
 
 export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeConfigDialogProps) {
   const [publishableKey, setPublishableKey] = useState('')
+  const [webhookSecret, setWebhookSecret] = useState('')
   const [showKey, setShowKey] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
   
   const existingConfig = getStoredStripeConfig()
 
@@ -31,11 +33,15 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
       return
     }
 
-    saveStripeConfig({ publishableKey: publishableKey.trim() })
+    saveStripeConfig({ 
+      publishableKey: publishableKey.trim(),
+      webhookSecret: webhookSecret.trim() || undefined
+    })
     toast.success('Stripe configuration saved!')
     onConfigured()
     onOpenChange(false)
     setPublishableKey('')
+    setWebhookSecret('')
   }
 
   const handleRemove = () => {
@@ -72,6 +78,11 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
                     <p className="text-xs text-muted-foreground">
                       Key: {existingConfig.publishableKey.slice(0, 12)}...
                     </p>
+                    {existingConfig.webhookSecret && (
+                      <p className="text-xs text-muted-foreground">
+                        Webhook: {existingConfig.webhookSecret.slice(0, 12)}...
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Button
@@ -122,8 +133,45 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
                   Your publishable key is safe to use in client-side code
                 </p>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="webhook-secret">Webhook Signing Secret (Optional)</Label>
+                <div className="relative">
+                  <Input
+                    id="webhook-secret"
+                    type={showSecret ? 'text' : 'password'}
+                    placeholder="whsec_..."
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecret(!showSecret)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showSecret ? <EyeSlash size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used to verify webhook events from Stripe. Find this in your webhook settings.
+                </p>
+              </div>
             </div>
           )}
+
+          <Card className="p-4 bg-muted/30">
+            <h3 className="font-semibold text-sm mb-2">Webhook Setup</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              To receive real-time payment updates, configure webhooks in your Stripe Dashboard:
+            </p>
+            <ol className="text-xs text-muted-foreground space-y-1">
+              <li>1. Go to Developers → Webhooks in Stripe Dashboard</li>
+              <li>2. Add endpoint: https://your-domain.com/api/webhooks/stripe</li>
+              <li>3. Select events: checkout.session.completed, customer.subscription.*</li>
+              <li>4. Copy the webhook signing secret and paste above</li>
+            </ol>
+          </Card>
 
           <Card className="p-4 bg-muted/30">
             <h3 className="font-semibold text-sm mb-2">Demo Mode</h3>

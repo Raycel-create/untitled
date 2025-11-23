@@ -2,6 +2,8 @@ import { loadStripe, Stripe } from '@stripe/stripe-js'
 
 export interface StripeConfig {
   publishableKey: string
+  secretKey?: string
+  webhookSecret?: string
 }
 
 export interface PaymentSession {
@@ -56,9 +58,24 @@ export const STRIPE_PRICE_IDS = {
 export async function createCheckoutSession(
   priceId: string,
   userEmail: string,
+  userId: string,
   publishableKey: string
 ): Promise<string | null> {
   try {
+    const config = getStoredStripeConfig()
+    
+    if (!config || !config.publishableKey) {
+      console.error('Stripe not configured')
+      return null
+    }
+
+    const stripe = await initializeStripe(config.publishableKey)
+    
+    if (!stripe) {
+      console.error('Failed to initialize Stripe')
+      return null
+    }
+
     const mockSessionId = `cs_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const mockSession = {
@@ -67,6 +84,7 @@ export async function createCheckoutSession(
       status: 'open',
       priceId,
       userEmail,
+      userId,
       createdAt: Date.now()
     }
     
