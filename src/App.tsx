@@ -747,6 +747,9 @@ function App() {
       currentPeriodEnd: stripeSubscription.currentPeriodEnd,
       cancelAtPeriodEnd: false
     }))
+    
+    setStripeCheckoutOpen(false)
+    setUpgradeModalOpen(false)
   }
 
   const handleSubscriptionCanceled = () => {

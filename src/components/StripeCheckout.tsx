@@ -74,9 +74,8 @@ export function StripeCheckout({ open, onOpenChange, userEmail, onSuccess, onCon
         )
         
         if (simulateSuccess) {
-          toast.success('Payment successful! Welcome to Pro! 🎉')
           onSuccess()
-          onOpenChange(false)
+          toast.success('Payment successful! Welcome to Pro! 🎉')
         } else {
           toast.info('Checkout canceled')
         }
