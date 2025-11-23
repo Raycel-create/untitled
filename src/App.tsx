@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -41,7 +41,7 @@ import {
   initializeAdminSession,
   type AdminSession 
 } from '@/lib/admin-auth'
-import { generateImage, generateVideo } from '@/lib/generation'
+import { generateImage, generateVideo, batchGenerateImages, upscaleImage } from '@/lib/generation'
 
 type MediaType = 'image' | 'video'
 
@@ -107,6 +107,10 @@ function App() {
     rotation: 0,
     flipH: false,
   })
+  const [batchCount, setBatchCount] = useState(1)
+  const [useImageToImage, setUseImageToImage] = useState(false)
+  const [transformStrength, setTransformStrength] = useState(0.75)
+  const [isUpscaling, setIsUpscaling] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useKV<SubscriptionStatus>(
     'subscription-status',
     initializeSubscription()
@@ -359,6 +363,8 @@ function App() {
       return
     }
 
+    const totalGenerations = batchCount > 1 ? batchCount : 1
+    
     if (!canGenerate(currentStatus)) {
       setUpgradeReason('limit_reached')
       setUpgradeModalOpen(true)
@@ -410,48 +416,115 @@ function App() {
         }
       }
 
-      let generatedUrl: string
+      const referenceImageUrl = useImageToImage && referenceImages.length > 0 
+        ? (referenceImages[0].edited || referenceImages[0].original)
+        : undefined
 
       if (mode === 'image') {
-        generatedUrl = await generateImage(
-          enhancedPrompt,
-          apiKeys ?? {},
-          provider,
-          progressCallback
-        )
-      } else {
-        generatedUrl = await generateVideo(
-          enhancedPrompt,
-          apiKeys ?? {},
-          provider,
-          progressCallback
-        )
-      }
+        if (batchCount > 1) {
+          const urls = await batchGenerateImages(
+            enhancedPrompt,
+            apiKeys ?? {},
+            provider,
+            progressCallback,
+            batchCount,
+            {
+              referenceImage: referenceImageUrl,
+              strength: transformStrength
+            }
+          )
 
-      setGenerationProgress(100)
-      setGenerationStage('Complete!')
-      setPreviewUrl(generatedUrl)
-      await new Promise(resolve => setTimeout(resolve, 500))
+          for (const url of urls) {
+            const newItem: MediaItem = {
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              type: mode,
+              prompt: prompt,
+              url: url,
+              createdAt: Date.now(),
+            }
+            setGallery(current => [...(current ?? []), newItem])
+          }
 
-      const newItem: MediaItem = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: mode,
-        prompt: prompt,
-        url: generatedUrl,
-        createdAt: Date.now(),
-      }
+          setSubscriptionStatus(current => {
+            const updated = current ?? initializeSubscription()
+            return {
+              ...updated,
+              generationsUsed: updated.generationsUsed + batchCount
+            }
+          })
 
-      setGallery(current => [...(current ?? []), newItem])
+          toast.success(`${batchCount} images generated successfully!`)
+        } else {
+          const generatedUrl = await generateImage(
+            enhancedPrompt,
+            apiKeys ?? {},
+            provider,
+            progressCallback,
+            {
+              referenceImage: referenceImageUrl,
+              strength: transformStrength
+            }
+          )
 
-      setSubscriptionStatus(current => {
-        const updated = current ?? initializeSubscription()
-        return {
-          ...updated,
-          generationsUsed: updated.generationsUsed + 1
+          setGenerationProgress(100)
+          setGenerationStage('Complete!')
+          setPreviewUrl(generatedUrl)
+          await new Promise(resolve => setTimeout(resolve, 500))
+
+          const newItem: MediaItem = {
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: mode,
+            prompt: prompt,
+            url: generatedUrl,
+            createdAt: Date.now(),
+          }
+
+          setGallery(current => [...(current ?? []), newItem])
+
+          setSubscriptionStatus(current => {
+            const updated = current ?? initializeSubscription()
+            return {
+              ...updated,
+              generationsUsed: updated.generationsUsed + 1
+            }
+          })
+          
+          toast.success('Image generated successfully!')
         }
-      })
+      } else {
+        const generatedUrl = await generateVideo(
+          enhancedPrompt,
+          apiKeys ?? {},
+          provider,
+          progressCallback
+        )
+
+        setGenerationProgress(100)
+        setGenerationStage('Complete!')
+        setPreviewUrl(generatedUrl)
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        const newItem: MediaItem = {
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: mode,
+          prompt: prompt,
+          url: generatedUrl,
+          createdAt: Date.now(),
+        }
+
+        setGallery(current => [...(current ?? []), newItem])
+
+        setSubscriptionStatus(current => {
+          const updated = current ?? initializeSubscription()
+          return {
+            ...updated,
+            generationsUsed: updated.generationsUsed + 1
+          }
+        })
+        
+        toast.success('Video generated successfully!')
+      }
       
-      toast.success(`${mode === 'image' ? 'Image' : 'Video'} generated successfully!`)
       setPrompt('')
       setSelectedStyle(null)
 
@@ -489,6 +562,65 @@ function App() {
     link.download = `${item.type}-${item.id}.${item.type === 'image' ? 'jpg' : 'mp4'}`
     link.click()
     toast.success('Download started')
+  }
+
+  const handleUpscale = async (item: MediaItem) => {
+    if (item.type !== 'image') {
+      toast.error('Only images can be upscaled')
+      return
+    }
+
+    const currentStatus = subscriptionStatus ?? initializeSubscription()
+    
+    if (!SUBSCRIPTION_LIMITS[currentStatus.tier].features.upscaling) {
+      setUpgradeReason('upgrade_prompt')
+      setUpgradeModalOpen(true)
+      toast.error('Upscaling is a Pro feature')
+      return
+    }
+
+    if (!apiKeys?.replicate) {
+      toast.error('Replicate API key required for upscaling')
+      setApiKeyManagerOpen(true)
+      return
+    }
+
+    setIsUpscaling(true)
+    setGenerationProgress(0)
+    setGenerationStage('Preparing to upscale...')
+
+    try {
+      const progressCallback = (update: { progress: number; stage: string }) => {
+        setGenerationProgress(update.progress)
+        setGenerationStage(update.stage)
+      }
+
+      const upscaledUrl = await upscaleImage(item.url, apiKeys ?? {}, progressCallback)
+
+      const newItem: MediaItem = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'image',
+        prompt: `${item.prompt} (Upscaled 4x)`,
+        url: upscaledUrl,
+        createdAt: Date.now(),
+      }
+
+      setGallery(current => [...(current ?? []), newItem])
+      toast.success('Image upscaled successfully!', {
+        description: '4x resolution enhancement applied'
+      })
+      setSelectedMedia(null)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Upscaling failed'
+      toast.error(errorMessage)
+      console.error('Upscaling error:', error)
+    } finally {
+      setTimeout(() => {
+        setIsUpscaling(false)
+        setGenerationProgress(0)
+        setGenerationStage('')
+      }, 1000)
+    }
   }
 
   const handleUpgrade = () => {
@@ -543,6 +675,9 @@ function App() {
   const maxReferenceImages = currentStatus.tier === 'pro' 
     ? SUBSCRIPTION_LIMITS.pro.maxReferenceImages 
     : SUBSCRIPTION_LIMITS.free.maxReferenceImages
+  const maxBatchSize = currentStatus.tier === 'pro'
+    ? SUBSCRIPTION_LIMITS.pro.maxBatchSize
+    : SUBSCRIPTION_LIMITS.free.maxBatchSize
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -781,6 +916,82 @@ function App() {
                       )}
                     </div>
                   </div>
+                  {referenceImages.length > 0 && (
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-center gap-2 mb-3">
+                        <label className="text-sm font-medium flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={useImageToImage}
+                            onChange={(e) => setUseImageToImage(e.target.checked)}
+                            className="w-4 h-4"
+                          />
+                          Enable Image-to-Image Transformation
+                        </label>
+                        {currentStatus.tier === 'free' && (
+                          <Badge variant="outline" className="text-xs">
+                            Available
+                          </Badge>
+                        )}
+                      </div>
+                      {useImageToImage && (
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">
+                            Transformation Strength: {Math.round(transformStrength * 100)}%
+                          </label>
+                          <Slider
+                            value={[transformStrength]}
+                            onValueChange={(v) => setTransformStrength(v[0])}
+                            min={0.1}
+                            max={1}
+                            step={0.05}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Lower values stay closer to reference, higher values allow more creativity
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium">
+                        Batch Generation
+                      </label>
+                      {currentStatus.tier === 'free' && batchCount > SUBSCRIPTION_LIMITS.free.maxBatchSize && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Crown weight="fill" size={10} />
+                          Pro Feature
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        value={[batchCount]}
+                        onValueChange={(v) => {
+                          const maxBatch = currentStatus.tier === 'pro' 
+                            ? SUBSCRIPTION_LIMITS.pro.maxBatchSize 
+                            : SUBSCRIPTION_LIMITS.free.maxBatchSize
+                          setBatchCount(Math.min(v[0], maxBatch))
+                        }}
+                        min={1}
+                        max={currentStatus.tier === 'pro' 
+                          ? SUBSCRIPTION_LIMITS.pro.maxBatchSize 
+                          : SUBSCRIPTION_LIMITS.free.maxBatchSize}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-md min-w-[80px] justify-center">
+                        <Stack weight="bold" size={16} />
+                        <span className="text-sm font-medium">{batchCount}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Generate {batchCount} variation{batchCount > 1 ? 's' : ''} at once
+                      {batchCount > 1 && ` (uses ${batchCount} generation${batchCount > 1 ? 's' : ''})`}
+                    </p>
+                  </div>
                   <div>
                     <label className="text-sm font-medium mb-2 block">
                       Style Presets
@@ -964,6 +1175,33 @@ function App() {
                 previewUrl={previewUrl}
               />
             )}
+            {isUpscaling && (
+              <Card className="p-6 border-primary/50 bg-primary/5">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <ArrowsOut size={24} weight="bold" className="text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold">Upscaling Image</h3>
+                      <p className="text-sm text-muted-foreground">{generationStage}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-medium">{Math.round(generationProgress)}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-300 rounded-full"
+                        style={{ width: `${generationProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
 
           <div>
@@ -1078,6 +1316,29 @@ function App() {
                 <p className="text-sm text-muted-foreground">{selectedMedia.prompt}</p>
               </div>
               <div className="flex gap-2">
+                {selectedMedia.type === 'image' && (
+                  <Button
+                    onClick={() => handleUpscale(selectedMedia)}
+                    variant="default"
+                    className="flex-1 gap-2"
+                    disabled={isUpscaling}
+                  >
+                    {isUpscaling ? (
+                      <>
+                        <div className="animate-spin">⟳</div>
+                        Upscaling...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowsOut weight="bold" />
+                        Upscale 4x
+                        {currentStatus.tier === 'free' && (
+                          <Crown weight="fill" size={12} className="ml-1" />
+                        )}
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   onClick={() => handleDownload(selectedMedia)}
                   variant="outline"

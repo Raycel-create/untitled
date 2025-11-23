@@ -16,6 +16,7 @@ export const SUBSCRIPTION_LIMITS = {
   free: {
     generationsPerMonth: 10,
     maxReferenceImages: 3,
+    maxBatchSize: 2,
     features: {
       imageGeneration: true,
       videoGeneration: false,
@@ -27,11 +28,15 @@ export const SUBSCRIPTION_LIMITS = {
       backgroundRemoval: false,
       advancedBodyEditing: false,
       proFilters: false,
+      imageToImage: true,
+      batchGeneration: true,
+      upscaling: false,
     }
   },
   pro: {
     generationsPerMonth: null,
     maxReferenceImages: 5,
+    maxBatchSize: 5,
     features: {
       imageGeneration: true,
       videoGeneration: true,
@@ -43,6 +48,9 @@ export const SUBSCRIPTION_LIMITS = {
       backgroundRemoval: true,
       advancedBodyEditing: true,
       proFilters: true,
+      imageToImage: true,
+      batchGeneration: true,
+      upscaling: true,
     }
   }
 }

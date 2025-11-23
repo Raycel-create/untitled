@@ -55,11 +55,32 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Success criteria**: Keys stored securely in browser, masked in UI, format validation works, clear error messages
 
 ### Text-to-Image Generation
-- **Functionality**: User enters text prompt, optionally selects style preset and applies editing tools to reference images, AI generates corresponding image
-- **Purpose**: Enable quick visual ideation and artistic exploration with creative control
+- **Functionality**: User enters text prompt, optionally selects style preset and applies editing tools to reference images, AI generates corresponding image with support for batch generation and image-to-image transformations
+- **Purpose**: Enable quick visual ideation and artistic exploration with creative control and efficient variation generation
 - **Trigger**: User types prompt and clicks "Generate Image" button
-- **Progression**: Check API keys configured → Enter prompt → (Optional) Select style preset → (Optional) Edit reference images with tools → Click generate → Loading state with progress → Image reveals → Auto-saves to gallery → Option to regenerate or create new
-- **Success criteria**: Images appear within 10 seconds, full resolution, properly formatted
+- **Progression**: Check API keys configured → Enter prompt → (Optional) Select style preset → (Optional) Enable image-to-image mode and adjust strength → (Optional) Set batch count for multiple variations → (Optional) Edit reference images with tools → Click generate → Loading state with progress → Image(s) reveal → Auto-saves to gallery → Option to regenerate or create new
+- **Success criteria**: Images appear within 10 seconds, full resolution, properly formatted, batch generations complete successfully
+
+### Image-to-Image Transformation
+- **Functionality**: Transform existing reference images using text prompts with adjustable transformation strength
+- **Purpose**: Enable users to modify and evolve existing images while maintaining core composition and style
+- **Trigger**: User uploads reference image and enables image-to-image mode
+- **Progression**: Upload reference image → Toggle image-to-image mode → Adjust transformation strength slider (10-100%) → Enter transformation prompt → Generate → AI transforms image based on prompt and strength → Result saved to gallery
+- **Success criteria**: Transformations respect strength setting, lower values stay closer to reference, clear visual feedback
+
+### Batch Generation
+- **Functionality**: Generate 1-5 variations simultaneously from a single prompt (2 max on free tier, 5 max on pro tier)
+- **Purpose**: Explore multiple creative interpretations efficiently and compare variations side-by-side
+- **Trigger**: User adjusts batch count slider before generating
+- **Progression**: Enter prompt → Adjust batch slider → See real-time count and generation cost → Click generate → Progress shows current batch progress → All variations saved to gallery → Usage counter increments by batch count
+- **Success criteria**: All requested variations generate successfully, progress tracking accurate, usage properly tracked
+
+### Image Upscaling
+- **Functionality**: Enhance generated images with 4x resolution upscaling (Pro feature only)
+- **Purpose**: Transform images to higher resolution for print or detailed viewing
+- **Trigger**: User clicks "Upscale 4x" button in image detail modal
+- **Progression**: Open image detail → Click upscale button → Progress indicator shows upscaling stages → Enhanced image saved as new gallery item with "(Upscaled 4x)" label → Original preserved
+- **Success criteria**: 4x resolution achieved, image quality improved, separate gallery entry created
 
 ### Style Presets
 - **Functionality**: Quick-select predefined artistic styles that modify generation parameters
@@ -111,10 +132,10 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Success criteria**: Smooth upload, clear visual feedback, max 5 enforced gracefully
 
 ### Subscription Tiers (Free vs Pro)
-- **Functionality**: Two-tier system with usage limits on free tier and unlimited access on pro tier
+- **Functionality**: Two-tier system with usage limits on free tier (10/month, 2 batch max, no upscaling) and unlimited access on pro tier (unlimited, 5 batch max, upscaling enabled)
 - **Purpose**: Monetize while providing value at both levels, encourage upgrades for power users
 - **Trigger**: User reaches free tier limits or clicks upgrade prompt
-- **Progression**: Generate content → Track usage → Show limit warnings at 80% → Block at 100% with upgrade modal → Click upgrade → Payment flow (simulated) → Pro features unlocked immediately
+- **Progression**: Generate content → Track usage → Show limit warnings at 80% → Block at 100% with upgrade modal → Click upgrade → Payment flow (simulated) → Pro features unlocked immediately (batch up to 5, upscaling enabled)
 - **Success criteria**: Limits enforced accurately, upgrade path clear and frictionless, pro features activate instantly
 
 ### 24/7 AI Assistant
@@ -140,6 +161,11 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Invalid API Keys**: Format validation on input, helpful error messages guide correction
 - **API Request Failures**: Detect provider errors vs network issues, show specific error messages, suggest checking API key validity
 - **Generation Failures**: Show clear error message with retry option, don't lose prompt text
+- **Batch Generation Partial Failures**: If some images in batch fail, save successful ones and show error count
+- **Upscaling on Free Tier**: Show upgrade prompt with clear messaging about Pro requirement
+- **Upscaling Failures**: Clear error messaging, original image preserved, suggest retrying
+- **Image-to-Image Without Reference**: Disable option until reference image uploaded
+- **Batch Count Exceeds Tier Limit**: Automatically cap at tier maximum, show upgrade prompt for higher limits
 - **Long Prompts**: Support multi-line text areas with character count, reasonable limits
 - **Empty Prompts**: Disable generate button until valid text entered
 - **Slow Generations**: Show engaging loading states with time estimates
@@ -202,11 +228,12 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Card for gallery items with hover effects
   - Dialog for fullscreen media preview, image editing, two-step MFA authentication, and API key management
   - InputOTP for secure 6-digit MFA code entry with visual feedback
-  - Progress indicator during generation
-  - Badge for media type labels, style presets, subscription tier, and key status
+  - Progress indicator during generation and upscaling
+  - Badge for media type labels, style presets, subscription tier, key status, and Pro-only features
   - Separator for visual section breaks
-  - Slider for image adjustment controls (brightness, contrast, blur)
+  - Slider for image adjustment controls (brightness, contrast, blur), transformation strength, and batch count
   - Toggle buttons for image transformations (flip, rotate)
+  - Checkbox for enabling image-to-image mode
   - Sheet (sliding panel) for AI assistant chat interface
   - Alert for MFA timer display, usage limit warnings, upgrade prompts, and API key notices
   - Input for secure API key entry with show/hide toggle
@@ -249,6 +276,8 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Eye/EyeSlash (Phosphor) for show/hide API keys
   - Check (Phosphor) for configured status
   - Info (Phosphor) for informational alerts
+  - ArrowsOut (Phosphor) for upscaling action
+  - Stack (Phosphor) for batch generation indicator
 - **Spacing**: 
   - Container: max-w-7xl mx-auto with px-4 sm:px-6 lg:px-8
   - Sections: gap-8 between major sections
