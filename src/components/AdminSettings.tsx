@@ -8,10 +8,11 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Lock, Eye, EyeSlash, ShieldCheck, Warning, Check, Plugs, Link } from '@phosphor-icons/react'
+import { Lock, Eye, EyeSlash, ShieldCheck, Warning, Check, Plugs, Link, ShoppingCart } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { initializeAdminCredentials, updateAdminCredentials, type StoredAdminCredentials } from '@/lib/admin-auth'
 import { setStripeAPIEndpoint } from '@/lib/stripe-api'
+import { StripePriceSetup } from '@/components/StripePriceSetup'
 
 interface AdminSettingsProps {
   open: boolean
@@ -224,10 +225,14 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
         </DialogHeader>
 
         <Tabs defaultValue="credentials" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="credentials" className="gap-2">
               <Lock size={16} />
               Credentials
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="gap-2">
+              <ShoppingCart size={16} />
+              Pricing
             </TabsTrigger>
             <TabsTrigger value="api" className="gap-2">
               <Plugs size={16} />
@@ -407,6 +412,10 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
                 )}
               </Button>
             </div>
+          </TabsContent>
+
+          <TabsContent value="pricing" className="space-y-6 py-4">
+            <StripePriceSetup />
           </TabsContent>
 
           <TabsContent value="api" className="space-y-6 py-4">

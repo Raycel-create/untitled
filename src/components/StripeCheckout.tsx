@@ -22,47 +22,51 @@ interface StripeCheckoutProps {
   onConfigureStripe: () => void
 }
 
-const STRIPE_PRICE_IDS = {
+const DEFAULT_STRIPE_PRICE_IDS = {
   pro_monthly: 'price_pro_monthly_v2',
   pro_yearly: 'price_pro_yearly_v2',
 }
-
-const PRICING_PLANS = [
-  {
-    id: 'monthly',
-    name: 'Monthly',
-    price: 19,
-    period: 'month',
-    priceId: STRIPE_PRICE_IDS.pro_monthly,
-    badge: null,
-    savings: null,
-  },
-  {
-    id: 'yearly',
-    name: 'Yearly',
-    price: 15,
-    period: 'month',
-    totalPrice: 180,
-    priceId: STRIPE_PRICE_IDS.pro_yearly,
-    badge: 'SAVE 21%',
-    savings: 48,
-  },
-]
 
 export function StripeCheckout({ open, onOpenChange, userEmail, userId, onSuccess, onConfigureStripe }: StripeCheckoutProps) {
   const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [isProcessing, setIsProcessing] = useState(false)
   const [apiEndpoint, setApiEndpoint] = useState<string | null>(null)
+  const [priceConfig, setPriceConfig] = useState<{monthlyPriceId: string, yearlyPriceId: string} | null>(null)
 
   const stripeConfig = getStoredStripeConfig()
 
   useEffect(() => {
-    async function loadEndpoint() {
+    async function loadConfig() {
       const endpoint = await window.spark.kv.get<string>('stripe-api-endpoint')
       setApiEndpoint(endpoint || null)
+      
+      const config = await window.spark.kv.get<{monthlyPriceId: string, yearlyPriceId: string}>('stripe-price-config')
+      setPriceConfig(config || null)
     }
-    loadEndpoint()
+    loadConfig()
   }, [])
+
+  const PRICING_PLANS = [
+    {
+      id: 'monthly',
+      name: 'Monthly',
+      price: 19,
+      period: 'month',
+      priceId: priceConfig?.monthlyPriceId || DEFAULT_STRIPE_PRICE_IDS.pro_monthly,
+      badge: null,
+      savings: null,
+    },
+    {
+      id: 'yearly',
+      name: 'Yearly',
+      price: 15,
+      period: 'month',
+      totalPrice: 180,
+      priceId: priceConfig?.yearlyPriceId || DEFAULT_STRIPE_PRICE_IDS.pro_yearly,
+      badge: 'SAVE 21%',
+      savings: 48,
+    },
+  ]
 
   const handleCheckout = async () => {
     if (!stripeConfig) {
