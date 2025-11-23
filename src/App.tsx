@@ -675,9 +675,6 @@ function App() {
   const maxReferenceImages = currentStatus.tier === 'pro' 
     ? SUBSCRIPTION_LIMITS.pro.maxReferenceImages 
     : SUBSCRIPTION_LIMITS.free.maxReferenceImages
-  const maxBatchSize = currentStatus.tier === 'pro'
-    ? SUBSCRIPTION_LIMITS.pro.maxBatchSize
-    : SUBSCRIPTION_LIMITS.free.maxBatchSize
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -916,82 +913,6 @@ function App() {
                       )}
                     </div>
                   </div>
-                  {referenceImages.length > 0 && (
-                    <div className="border border-border rounded-lg p-4 bg-muted/30">
-                      <div className="flex items-center gap-2 mb-3">
-                        <label className="text-sm font-medium flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={useImageToImage}
-                            onChange={(e) => setUseImageToImage(e.target.checked)}
-                            className="w-4 h-4"
-                          />
-                          Enable Image-to-Image Transformation
-                        </label>
-                        {currentStatus.tier === 'free' && (
-                          <Badge variant="outline" className="text-xs">
-                            Available
-                          </Badge>
-                        )}
-                      </div>
-                      {useImageToImage && (
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            Transformation Strength: {Math.round(transformStrength * 100)}%
-                          </label>
-                          <Slider
-                            value={[transformStrength]}
-                            onValueChange={(v) => setTransformStrength(v[0])}
-                            min={0.1}
-                            max={1}
-                            step={0.05}
-                            className="w-full"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Lower values stay closer to reference, higher values allow more creativity
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium">
-                        Batch Generation
-                      </label>
-                      {currentStatus.tier === 'free' && batchCount > SUBSCRIPTION_LIMITS.free.maxBatchSize && (
-                        <Badge variant="outline" className="text-xs gap-1">
-                          <Crown weight="fill" size={10} />
-                          Pro Feature
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Slider
-                        value={[batchCount]}
-                        onValueChange={(v) => {
-                          const maxBatch = currentStatus.tier === 'pro' 
-                            ? SUBSCRIPTION_LIMITS.pro.maxBatchSize 
-                            : SUBSCRIPTION_LIMITS.free.maxBatchSize
-                          setBatchCount(Math.min(v[0], maxBatch))
-                        }}
-                        min={1}
-                        max={currentStatus.tier === 'pro' 
-                          ? SUBSCRIPTION_LIMITS.pro.maxBatchSize 
-                          : SUBSCRIPTION_LIMITS.free.maxBatchSize}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-md min-w-[80px] justify-center">
-                        <Stack weight="bold" size={16} />
-                        <span className="text-sm font-medium">{batchCount}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Generate {batchCount} variation{batchCount > 1 ? 's' : ''} at once
-                      {batchCount > 1 && ` (uses ${batchCount} generation${batchCount > 1 ? 's' : ''})`}
-                    </p>
-                  </div>
                   <div>
                     <label className="text-sm font-medium mb-2 block">
                       Style Presets
@@ -1175,33 +1096,6 @@ function App() {
                 previewUrl={previewUrl}
               />
             )}
-            {isUpscaling && (
-              <Card className="p-6 border-primary/50 bg-primary/5">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <ArrowsOut size={24} weight="bold" className="text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold">Upscaling Image</h3>
-                      <p className="text-sm text-muted-foreground">{generationStage}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{Math.round(generationProgress)}%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-300 rounded-full"
-                        style={{ width: `${generationProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
           </div>
 
           <div>
@@ -1316,29 +1210,6 @@ function App() {
                 <p className="text-sm text-muted-foreground">{selectedMedia.prompt}</p>
               </div>
               <div className="flex gap-2">
-                {selectedMedia.type === 'image' && (
-                  <Button
-                    onClick={() => handleUpscale(selectedMedia)}
-                    variant="default"
-                    className="flex-1 gap-2"
-                    disabled={isUpscaling}
-                  >
-                    {isUpscaling ? (
-                      <>
-                        <div className="animate-spin">⟳</div>
-                        Upscaling...
-                      </>
-                    ) : (
-                      <>
-                        <ArrowsOut weight="bold" />
-                        Upscale 4x
-                        {currentStatus.tier === 'free' && (
-                          <Crown weight="fill" size={12} className="ml-1" />
-                        )}
-                      </>
-                    )}
-                  </Button>
-                )}
                 <Button
                   onClick={() => handleDownload(selectedMedia)}
                   variant="outline"
