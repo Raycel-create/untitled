@@ -19,6 +19,7 @@ import { APIKeyBanner } from '@/components/APIKeyBanner'
 import { LandingPage } from '@/components/LandingPage'
 import { StripeConfigDialog } from '@/components/StripeConfigDialog'
 import { StripeSetupBanner } from '@/components/StripeSetupBanner'
+import { StripePublishableKeyBanner } from '@/components/StripePublishableKeyBanner'
 import { StripeCheckout } from '@/components/StripeCheckout'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { CEODashboard } from '@/components/CEODashboard'
@@ -38,6 +39,7 @@ import {
 import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
 import { initializeAuth, type User, type AuthState } from '@/lib/auth'
 import { getStoredStripeConfig, simulateSuccessfulPayment } from '@/lib/stripe'
+import { initializeStripeConfig, needsPublishableKey } from '@/lib/stripe-config-init'
 import { 
   createAdminSession, 
   isAdminSessionValid, 
@@ -143,6 +145,7 @@ function App() {
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [dismissedStripeBanner, setDismissedStripeBanner] = useState(false)
+  const [dismissedPublishableKeyBanner, setDismissedPublishableKeyBanner] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -151,11 +154,13 @@ function App() {
   const filteredGallery = (gallery ?? []).filter(item => item.type === mode)
   const hasConfiguredKeys = hasAnyProvider(apiKeys ?? {})
   const stripeConfig = getStoredStripeConfig()
-  const hasStripeConfigured = !!stripeConfig
+  const hasStripeConfigured = !!stripeConfig?.publishableKey
+  const needsPublishableKeySetup = needsPublishableKey()
   const isCEOMode = isAdminSessionValid(adminSession ?? null)
 
   useEffect(() => {
     setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
+    initializeStripeConfig()
   }, [])
 
   useEffect(() => {
@@ -937,7 +942,15 @@ function App() {
         {mainTab === 'generate' ? (
           <div className="grid lg:grid-cols-[400px_1fr] gap-8">
           <div className="space-y-6">
-            {!hasStripeConfigured && !dismissedStripeBanner && (
+            {needsPublishableKeySetup && !dismissedPublishableKeyBanner ? (
+              <StripePublishableKeyBanner
+                onConfigureClick={() => {
+                  setStripeConfigOpen(true)
+                  setDismissedPublishableKeyBanner(true)
+                }}
+                onDismiss={() => setDismissedPublishableKeyBanner(true)}
+              />
+            ) : !hasStripeConfigured && !dismissedStripeBanner ? (
               <StripeSetupBanner
                 onConfigured={() => {
                   setDismissedStripeBanner(true)
@@ -947,7 +960,7 @@ function App() {
                 }}
                 onDismiss={() => setDismissedStripeBanner(true)}
               />
-            )}
+            ) : null}
 
             <APIKeyBanner 
               hasAnyKey={hasConfiguredKeys}

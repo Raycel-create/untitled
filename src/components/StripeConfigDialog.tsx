@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { CreditCard, Eye, EyeSlash, Check } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { saveStripeConfig, clearStripeConfig, getStoredStripeConfig } from '@/lib/stripe'
+import { STRIPE_LIVE_CONFIG } from '@/lib/stripe-config-init'
 
 interface StripeConfigDialogProps {
   open: boolean
@@ -21,7 +22,8 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
   const [showSecret, setShowSecret] = useState(false)
   
   const existingConfig = getStoredStripeConfig()
-  const hasSecretKey = existingConfig?.secretKey && existingConfig.secretKey.length > 0
+  const hasSecretKey = (existingConfig?.secretKey || STRIPE_LIVE_CONFIG.secretKey) && 
+    (existingConfig?.secretKey || STRIPE_LIVE_CONFIG.secretKey).length > 0
 
   const handleSave = () => {
     if (!publishableKey.trim()) {
@@ -34,8 +36,11 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
       return
     }
 
+    const secretKey = existingConfig?.secretKey || STRIPE_LIVE_CONFIG.secretKey
+
     saveStripeConfig({ 
       publishableKey: publishableKey.trim(),
+      secretKey: secretKey || undefined,
       webhookSecret: webhookSecret.trim() || undefined
     })
     toast.success('Stripe configuration saved!')
@@ -62,7 +67,10 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
             <DialogTitle>Configure Stripe</DialogTitle>
           </div>
           <DialogDescription>
-            Connect your Stripe account to enable subscription payments
+            {hasSecretKey 
+              ? '🚀 Your backend is ready! Just add your publishable key to complete the setup.'
+              : 'Connect your Stripe account to enable subscription payments'
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -76,7 +84,8 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
                 <div>
                   <p className="font-medium text-sm">Secret Key Configured</p>
                   <p className="text-xs text-muted-foreground">
-                    Backend key ready: sk_live_51SKFp5...{existingConfig?.secretKey?.slice(-6)}
+                    Backend key ready: {(existingConfig?.secretKey || STRIPE_LIVE_CONFIG.secretKey || '').slice(0, 17)}...
+                    {(existingConfig?.secretKey || STRIPE_LIVE_CONFIG.secretKey || '').slice(-6)}
                   </p>
                 </div>
               </div>
@@ -116,27 +125,35 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
               <Card className="p-4 bg-purple-500/10 border-purple-500/20">
                 <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
                   <CreditCard weight="fill" size={16} />
-                  {hasSecretKey ? 'Complete Setup' : 'Getting Your Stripe Key'}
+                  {hasSecretKey ? '🎉 Almost Done! Get Your Publishable Key' : 'Getting Your Stripe Key'}
                 </h3>
                 <ol className="text-sm space-y-1.5 text-muted-foreground">
-                  <li>1. Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">dashboard.stripe.com/apikeys</a></li>
-                  <li>2. Make sure you're in {hasSecretKey ? 'LIVE mode' : 'the correct mode'} (toggle top-right)</li>
-                  <li>3. Find "Publishable key" (starts with pk_live_ or pk_test_)</li>
-                  <li>4. Click "Reveal live key token" and copy it</li>
-                  <li>5. Paste it below</li>
+                  <li>1. Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">dashboard.stripe.com/apikeys</a></li>
+                  <li>2. Toggle to <span className="font-semibold text-foreground">LIVE mode</span> in the top-right corner</li>
+                  <li>3. Find "<span className="font-semibold text-foreground">Publishable key</span>" (starts with pk_live_51SKFp5...)</li>
+                  <li>4. Click "<span className="font-semibold text-foreground">Reveal live key token</span>" button</li>
+                  <li>5. Copy the key and paste it below 👇</li>
                 </ol>
+                {hasSecretKey && (
+                  <div className="mt-3 p-2 bg-green-500/10 border border-green-500/20 rounded text-xs">
+                    <p className="text-green-600 dark:text-green-400 font-medium">
+                      ✓ Your secret key (sk_live_51SKFp5...) is already configured!
+                    </p>
+                  </div>
+                )}
               </Card>
 
               <div className="space-y-2">
-                <Label htmlFor="stripe-key">Stripe Publishable Key</Label>
+                <Label htmlFor="stripe-key">Stripe Publishable Key (Required)</Label>
                 <div className="relative">
                   <Input
                     id="stripe-key"
                     type={showKey ? 'text' : 'password'}
-                    placeholder="pk_test_..."
+                    placeholder="pk_live_51SKFp5AMnqPgToIM..."
                     value={publishableKey}
                     onChange={(e) => setPublishableKey(e.target.value)}
-                    className="pr-10"
+                    className="pr-10 font-mono text-sm"
+                    autoFocus
                   />
                   <button
                     type="button"
@@ -147,7 +164,7 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Your publishable key is safe to use in client-side code
+                  Your publishable key is safe to use in client-side code and starts with pk_live_
                 </p>
               </div>
 
@@ -191,9 +208,23 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
           </Card>
 
           <Card className="p-4 bg-muted/30">
+            <h3 className="font-semibold text-sm mb-2">💡 Quick Tip</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              Your publishable key and secret key should match:
+            </p>
+            <div className="text-xs font-mono bg-muted p-2 rounded space-y-1">
+              <p className="text-green-600 dark:text-green-400">✓ Secret: sk_live_51SKFp5AMnqPgToIM...</p>
+              <p className="text-primary">→ Publishable: pk_live_51SKFp5AMnqPgToIM...</p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Notice they both start with the same account ID (51SKFp5AMnqPgToIM)
+            </p>
+          </Card>
+
+          <Card className="p-4 bg-muted/30">
             <h3 className="font-semibold text-sm mb-2">Demo Mode</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              This integration uses Stripe's test mode. Use test card: 4242 4242 4242 4242 with any future expiry and CVC.
+              This integration uses Stripe's live mode. Use test card: 4242 4242 4242 4242 with any future expiry and CVC.
             </p>
             <p className="text-xs text-muted-foreground">
               For production, you'll need to set up webhooks and server-side payment processing.

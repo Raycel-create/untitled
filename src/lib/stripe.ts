@@ -35,7 +35,18 @@ export function resetStripe() {
 export function getStoredStripeConfig(): StripeConfig | null {
   try {
     const config = localStorage.getItem('stripe-config')
-    return config ? JSON.parse(config) : null
+    if (!config) return null
+    
+    const parsed = JSON.parse(config)
+    
+    if (!parsed.secretKey) {
+      const { STRIPE_LIVE_CONFIG } = require('./stripe-config-init')
+      if (STRIPE_LIVE_CONFIG.secretKey) {
+        parsed.secretKey = STRIPE_LIVE_CONFIG.secretKey
+      }
+    }
+    
+    return parsed
   } catch {
     return null
   }
