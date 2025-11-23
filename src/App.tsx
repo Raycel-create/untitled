@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -24,6 +24,7 @@ import { CEODashboard } from '@/components/CEODashboard'
 import { AdminLogin } from '@/components/AdminLogin'
 import { AdminSettings } from '@/components/AdminSettings'
 import { GenerationProgress } from '@/components/GenerationProgress'
+import { TemplateRecommendations } from '@/components/TemplateRecommendations'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -137,6 +138,7 @@ function App() {
   const [adminSession, setAdminSession] = useKV<AdminSession>('admin-session', initializeAdminSession())
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
+  const [showRecommendations, setShowRecommendations] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -621,6 +623,7 @@ function App() {
       setSelectedStyle(null)
       setSelectedVideoTemplate(null)
       setSelectedAnimationStyle(null)
+      setShowRecommendations(false)
 
       if (shouldShowUpgradePrompt(currentStatus)) {
         setTimeout(() => {
@@ -1091,10 +1094,50 @@ function App() {
                       className="resize-none"
                       disabled={isGenerating}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {prompt.length} characters
-                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-muted-foreground">
+                        {prompt.length} characters
+                      </p>
+                      {prompt.trim() && !showRecommendations && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowRecommendations(true)}
+                          className="gap-2 text-xs h-7"
+                        >
+                          <MagicWand weight="fill" size={14} />
+                          Get AI Recommendations
+                        </Button>
+                      )}
+                    </div>
                   </div>
+
+                  {showRecommendations && prompt.trim() && (
+                    <TemplateRecommendations
+                      prompt={prompt}
+                      tier={currentStatus.tier}
+                      selectedTemplate={selectedVideoTemplate}
+                      selectedStyle={selectedAnimationStyle}
+                      onSelectTemplate={(template) => setSelectedVideoTemplate(template)}
+                      onSelectStyle={(style) => setSelectedAnimationStyle(style)}
+                      onClose={() => setShowRecommendations(false)}
+                    />
+                  )}
+
+                  {!showRecommendations && (
+                    <VideoTemplateSelector
+                      selectedTemplate={selectedVideoTemplate}
+                      selectedStyle={selectedAnimationStyle}
+                      onTemplateSelect={setSelectedVideoTemplate}
+                      onStyleSelect={setSelectedAnimationStyle}
+                      isPro={currentStatus.tier === 'pro'}
+                      onUpgradeClick={() => {
+                        setUpgradeReason('upgrade_prompt')
+                        setUpgradeModalOpen(true)
+                      }}
+                    />
+                  )}
+
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium">

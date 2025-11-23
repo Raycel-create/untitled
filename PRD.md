@@ -117,6 +117,13 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Progression**: Select video template → Browse animation styles → Choose style that matches desired mood → Style automatically applies speed and mood modifiers → Generate video with combined template + style → Result reflects both template motion and style personality
 - **Success criteria**: Styles visually distinct, combine well with templates, Pro styles clearly marked, preview descriptions accurate
 
+### AI Template Recommendation System
+- **Functionality**: Intelligent analysis of user's video prompt to automatically recommend the most suitable video templates and animation styles based on intent, mood, motion type, and creative goals
+- **Purpose**: Help users quickly discover the perfect templates and styles for their vision, improving output quality and reducing trial-and-error
+- **Trigger**: User clicks "Get AI Recommendations" button after entering video prompt
+- **Progression**: Enter video prompt → Click recommendation button → AI analyzes prompt for mood, motion, category, complexity → Loading state with "Analyzing your prompt..." → Recommendations panel displays with 3-5 ranked templates (scored 0-100) → 2-3 ranked animation styles shown → Each recommendation includes reasoning and score → Click recommendation to apply → Recommendations persist while editing → Close panel to return to manual selection → Re-analyze button available for prompt changes
+- **Success criteria**: Analysis completes within 3-5 seconds, recommendations feel relevant to prompt, reasoning is clear and helpful, scores reflect quality of match, one-click application works smoothly, gracefully falls back to keyword matching if AI unavailable
+
 ### Persistent Gallery
 - **Functionality**: Display all previously generated media in organized grid
 - **Purpose**: Maintain creation history and enable revisiting past works
@@ -189,6 +196,9 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Network Issues**: Detect connectivity problems, show appropriate messaging
 - **Free Tier Limit Reached**: Clear messaging about upgrade benefits, don't block access to existing content
 - **Assistant Unavailable**: Graceful degradation if AI service fails, show cached suggestions
+- **Recommendation Analysis Failures**: Fall back to keyword-based matching if AI analysis fails, show generic recommendations, allow manual template selection
+- **No Recommendations Found**: Clear messaging that prompt works well without templates, manual selection still available
+- **Recommendation Scoring Edge Cases**: Ensure scores between 0-100, handle ties gracefully, filter out Pro templates on free tier
 - **Subscription Status Sync**: Handle edge cases where payment succeeds but status doesn't update immediately
 
 ## Design Direction
