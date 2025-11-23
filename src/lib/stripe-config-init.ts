@@ -5,42 +5,55 @@ export const STRIPE_LIVE_CONFIG = {
 }
 
 export const STRIPE_PRICE_IDS = {
-  pro_monthly: 'price_1XXXXXXXXXXXXXXXXX',
-  pro_yearly: 'price_1XXXXXXXXXXXXXXXXX'
+  pro_monthly: 'price_1SKFp5AMnqPgToIMdBH5z3xNm',
+  pro_yearly: 'price_1SKFp5AMnqPgToIMxYz9K4Lp'
 }
 
 export function initializeStripeConfig() {
   if (typeof window === 'undefined') return
 
   const existingConfig = localStorage.getItem('stripe-config')
+  
+  if (STRIPE_LIVE_CONFIG.secretKey) {
+    if (existingConfig) {
+      try {
+        const parsed = JSON.parse(existingConfig)
+        
+        if (!parsed.secretKey) {
+          parsed.secretKey = STRIPE_LIVE_CONFIG.secretKey
+          localStorage.setItem('stripe-config', JSON.stringify(parsed))
+        }
+        
+        return parsed
+      } catch {
+        const config = {
+          secretKey: STRIPE_LIVE_CONFIG.secretKey,
+          needsPublishableKey: true,
+          mode: STRIPE_LIVE_CONFIG.mode
+        }
+        
+        localStorage.setItem('stripe-config', JSON.stringify(config))
+        return config
+      }
+    } else {
+      const config = {
+        secretKey: STRIPE_LIVE_CONFIG.secretKey,
+        publishableKey: STRIPE_LIVE_CONFIG.publishableKey || '',
+        needsPublishableKey: !STRIPE_LIVE_CONFIG.publishableKey,
+        mode: STRIPE_LIVE_CONFIG.mode
+      }
+      
+      localStorage.setItem('stripe-config', JSON.stringify(config))
+      return config
+    }
+  }
+
   if (existingConfig) {
     try {
       return JSON.parse(existingConfig)
     } catch {
       return null
     }
-  }
-
-  if (STRIPE_LIVE_CONFIG.secretKey && !STRIPE_LIVE_CONFIG.publishableKey) {
-    const config = {
-      secretKey: STRIPE_LIVE_CONFIG.secretKey,
-      needsPublishableKey: true,
-      mode: STRIPE_LIVE_CONFIG.mode
-    }
-    
-    localStorage.setItem('stripe-config', JSON.stringify(config))
-    return config
-  }
-
-  if (STRIPE_LIVE_CONFIG.publishableKey) {
-    const config = {
-      publishableKey: STRIPE_LIVE_CONFIG.publishableKey,
-      secretKey: STRIPE_LIVE_CONFIG.secretKey,
-      mode: STRIPE_LIVE_CONFIG.mode
-    }
-
-    localStorage.setItem('stripe-config', JSON.stringify(config))
-    return config
   }
   
   return null
