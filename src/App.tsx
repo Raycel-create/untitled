@@ -18,6 +18,7 @@ import { APIKeyManager } from '@/components/APIKeyManager'
 import { APIKeyBanner } from '@/components/APIKeyBanner'
 import { LandingPage } from '@/components/LandingPage'
 import { StripeConfigDialog } from '@/components/StripeConfigDialog'
+import { StripeSetupBanner } from '@/components/StripeSetupBanner'
 import { StripeCheckout } from '@/components/StripeCheckout'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { CEODashboard } from '@/components/CEODashboard'
@@ -141,6 +142,7 @@ function App() {
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
+  const [dismissedStripeBanner, setDismissedStripeBanner] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -935,6 +937,18 @@ function App() {
         {mainTab === 'generate' ? (
           <div className="grid lg:grid-cols-[400px_1fr] gap-8">
           <div className="space-y-6">
+            {!hasStripeConfigured && !dismissedStripeBanner && (
+              <StripeSetupBanner
+                onConfigured={() => {
+                  setDismissedStripeBanner(true)
+                  toast.success('Stripe is ready!', {
+                    description: 'You can now accept Pro subscriptions'
+                  })
+                }}
+                onDismiss={() => setDismissedStripeBanner(true)}
+              />
+            )}
+
             <APIKeyBanner 
               hasAnyKey={hasConfiguredKeys}
               onConfigureClick={() => setApiKeyManagerOpen(true)}

@@ -21,6 +21,7 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
   const [showSecret, setShowSecret] = useState(false)
   
   const existingConfig = getStoredStripeConfig()
+  const hasSecretKey = existingConfig?.secretKey && existingConfig.secretKey.length > 0
 
   const handleSave = () => {
     if (!publishableKey.trim()) {
@@ -66,6 +67,22 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          {hasSecretKey && (
+            <Card className="p-4 bg-green-500/10 border-green-500/20 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-500 p-2 rounded-lg">
+                  <Check weight="bold" className="text-white" size={20} />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Secret Key Configured</p>
+                  <p className="text-xs text-muted-foreground">
+                    Backend key ready: sk_live_51SKFp5...{existingConfig?.secretKey?.slice(-6)}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {existingConfig ? (
             <Card className="p-4 bg-muted/50 border-primary/20">
               <div className="flex items-center justify-between">
@@ -96,16 +113,16 @@ export function StripeConfigDialog({ open, onOpenChange, onConfigured }: StripeC
             </Card>
           ) : (
             <div className="space-y-4">
-              <Card className="p-4 bg-blue-500/10 border-blue-500/20">
+              <Card className="p-4 bg-purple-500/10 border-purple-500/20">
                 <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
                   <CreditCard weight="fill" size={16} />
-                  Getting Your Stripe Key
+                  {hasSecretKey ? 'Complete Setup' : 'Getting Your Stripe Key'}
                 </h3>
                 <ol className="text-sm space-y-1.5 text-muted-foreground">
-                  <li>1. Go to <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">stripe.com/dashboard</a></li>
-                  <li>2. Click "Developers" in the top right</li>
-                  <li>3. Select "API keys" from the left menu</li>
-                  <li>4. Copy your "Publishable key" (starts with pk_)</li>
+                  <li>1. Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">dashboard.stripe.com/apikeys</a></li>
+                  <li>2. Make sure you're in {hasSecretKey ? 'LIVE mode' : 'the correct mode'} (toggle top-right)</li>
+                  <li>3. Find "Publishable key" (starts with pk_live_ or pk_test_)</li>
+                  <li>4. Click "Reveal live key token" and copy it</li>
                   <li>5. Paste it below</li>
                 </ol>
               </Card>
