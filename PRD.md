@@ -97,11 +97,25 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Success criteria**: Edits apply smoothly, preview updates instantly, changes persist until regeneration
 
 ### Text-to-Video Generation
-- **Functionality**: User enters text prompt, AI generates short video clip
-- **Purpose**: Bring dynamic motion and storytelling to creative ideas
+- **Functionality**: User enters text prompt, optionally selects video template and animation style, AI generates short video clip with applied effects
+- **Purpose**: Bring dynamic motion and storytelling to creative ideas with professional-quality templates and animation presets
 - **Trigger**: User types prompt and clicks "Generate Video" button
-- **Progression**: Enter prompt → Click generate → Extended loading with progress indicator → Video reveals with playback controls → Auto-saves to gallery → Option to regenerate or create new
-- **Success criteria**: Videos load properly, playback controls work smoothly, reasonable resolution and duration
+- **Progression**: Enter prompt → (Optional) Select video template (Motion, Transition, Effect, Storytelling) → (Optional) Select animation style → Click generate → Extended loading with progress indicator → Video reveals with playback controls → Auto-saves to gallery → Option to regenerate or create new
+- **Success criteria**: Videos load properly, playback controls work smoothly, reasonable resolution and duration, templates apply correctly
+
+### Video Templates
+- **Functionality**: 20+ preset video motion templates across 4 categories (Motion, Transition, Effect, Storytelling) with specific camera movements, transitions, and effects
+- **Purpose**: Enable users to quickly create professional-quality video animations without complex prompting or technical knowledge
+- **Trigger**: User switches to video mode and browses template categories
+- **Progression**: Open video tab → Browse template categories (Motion/Transition/Effect/Storytelling) → Preview template descriptions → Select desired template → Template modifiers automatically enhance prompt → Generate video with applied template → Result includes selected motion/effect
+- **Success criteria**: Templates categorized clearly, descriptions helpful, Pro-only templates indicated, templates combine properly with user prompts
+
+### Animation Styles
+- **Functionality**: 10 preset animation style modifiers (Smooth & Elegant, Energetic & Dynamic, Dreamlike & Surreal, etc.) that control movement speed, mood, and aesthetic
+- **Purpose**: Apply consistent motion personality and pacing to videos, making it easy to match brand aesthetics or creative vision
+- **Trigger**: User selects animation style after choosing video template
+- **Progression**: Select video template → Browse animation styles → Choose style that matches desired mood → Style automatically applies speed and mood modifiers → Generate video with combined template + style → Result reflects both template motion and style personality
+- **Success criteria**: Styles visually distinct, combine well with templates, Pro styles clearly marked, preview descriptions accurate
 
 ### Persistent Gallery
 - **Functionality**: Display all previously generated media in organized grid
@@ -161,6 +175,8 @@ An AI-powered creative studio with secure authentication that generates stunning
 - **Invalid API Keys**: Format validation on input, helpful error messages guide correction
 - **API Request Failures**: Detect provider errors vs network issues, show specific error messages, suggest checking API key validity
 - **Generation Failures**: Show clear error message with retry option, don't lose prompt text
+- **Template + Style Combinations**: All valid combinations work correctly, prompt enhancements layer properly
+- **Pro Template Access on Free Tier**: Show upgrade prompt with clear messaging about Pro requirement
 - **Batch Generation Partial Failures**: If some images in batch fail, save successful ones and show error count
 - **Upscaling on Free Tier**: Show upgrade prompt with clear messaging about Pro requirement
 - **Upscaling Failures**: Clear error messaging, original image preserved, suggest retrying
@@ -220,8 +236,9 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
 ## Component Selection
 
 - **Components**: 
-  - Tabs for mode switching (Image/Video) and dashboard navigation (Overview/API/Banking)
-  - Card for authentication forms, gallery items, dashboard metrics, bank accounts, API providers
+  - Tabs for mode switching (Image/Video), dashboard navigation (Overview/API/Banking), and video template categories (Motion/Transition/Effect/Storytelling)
+  - Card for authentication forms, gallery items, dashboard metrics, bank accounts, API providers, video templates, and animation styles
+  - ScrollArea for video template and animation style selectors with many options
   - Input for email, password, name, API keys with secure masking
   - Textarea for prompt input with character counter
   - Button for generate actions with loading states
@@ -252,7 +269,8 @@ Motion should feel fluid and purposeful, with smooth state transitions that guid
   - Textarea: empty (placeholder) → typing → valid (ready to generate)
 - **Icon Selection**: 
   - Sparkles (Phosphor) for generate buttons (AI magic)
-  - Crown (Phosphor) for CEO role and pro tier badge
+  - Crown (Phosphor) for CEO role, pro tier badge, and Pro-only features
+  - Template category icons: emoji-based visual indicators for each template (🎬, 🔍, 🌀, etc.)
   - Shield (Phosphor) for authentication/security
   - ShieldCheck (Phosphor) for MFA verification
   - Lock (Phosphor) for admin authentication

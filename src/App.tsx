@@ -42,6 +42,8 @@ import {
   type AdminSession 
 } from '@/lib/admin-auth'
 import { generateImage, generateVideo, batchGenerateImages, upscaleImage } from '@/lib/generation'
+import { VideoTemplateSelector } from '@/components/VideoTemplateSelector'
+import { combineTemplateAndStyle, type VideoTemplate, type AnimationStyle } from '@/lib/video-templates'
 
 type MediaType = 'image' | 'video'
 
@@ -118,6 +120,8 @@ function App() {
   const [useVideoToVideo, setUseVideoToVideo] = useState(false)
   const [transformStrength, setTransformStrength] = useState(0.75)
   const [isUpscaling, setIsUpscaling] = useState(false)
+  const [selectedVideoTemplate, setSelectedVideoTemplate] = useState<VideoTemplate | null>(null)
+  const [selectedAnimationStyle, setSelectedAnimationStyle] = useState<AnimationStyle | null>(null)
   const [subscriptionStatus, setSubscriptionStatus] = useKV<SubscriptionStatus>(
     'subscription-status',
     initializeSubscription()
@@ -457,11 +461,15 @@ function App() {
     try {
       let finalPrompt = prompt
       
-      if (selectedStyle) {
+      if (mode === 'image' && selectedStyle) {
         const preset = stylePresets.find(p => p.id === selectedStyle)
         if (preset) {
           finalPrompt = `${prompt}, ${preset.promptModifier}`
         }
+      }
+
+      if (mode === 'video') {
+        finalPrompt = combineTemplateAndStyle(selectedVideoTemplate, selectedAnimationStyle, prompt)
       }
 
       setGenerationStage('Enhancing prompt with AI...')
@@ -611,6 +619,8 @@ function App() {
       
       setPrompt('')
       setSelectedStyle(null)
+      setSelectedVideoTemplate(null)
+      setSelectedAnimationStyle(null)
 
       if (shouldShowUpgradePrompt(currentStatus)) {
         setTimeout(() => {
@@ -1026,6 +1036,17 @@ function App() {
                       </p>
                     )}
                   </div>
+                  <VideoTemplateSelector
+                    selectedTemplate={selectedVideoTemplate}
+                    selectedStyle={selectedAnimationStyle}
+                    onTemplateSelect={setSelectedVideoTemplate}
+                    onStyleSelect={setSelectedAnimationStyle}
+                    isPro={currentStatus.tier === 'pro'}
+                    onUpgradeClick={() => {
+                      setUpgradeReason('upgrade_prompt')
+                      setUpgradeModalOpen(true)
+                    }}
+                  />
                   <div className="flex gap-2">
                     <Button
                       onClick={handleGenerate}
