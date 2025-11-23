@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CreditCard, Crown, Check, Lock, Lightning } from '@phosphor-icons/react'
+import { CreditCard, Crown, Check, Lock, Lightning, Warning } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { getStoredStripeConfig, createCheckoutSession, STRIPE_PRICE_IDS } from '@/lib/stripe'
+import { getStoredStripeConfig } from '@/lib/stripe'
+import { 
+  createCheckoutSession, 
+  completeCheckoutSession, 
+  validateStripeKey,
+  type StripeConfig 
+} from '@/lib/stripe-api'
 
 interface StripeCheckoutProps {
   open: boolean
@@ -14,6 +20,11 @@ interface StripeCheckoutProps {
   userId: string
   onSuccess: () => void
   onConfigureStripe: () => void
+}
+
+const STRIPE_PRICE_IDS = {
+  pro_monthly: 'price_pro_monthly_v2',
+  pro_yearly: 'price_pro_yearly_v2',
 }
 
 const PRICING_PLANS = [
@@ -41,12 +52,28 @@ const PRICING_PLANS = [
 export function StripeCheckout({ open, onOpenChange, userEmail, userId, onSuccess, onConfigureStripe }: StripeCheckoutProps) {
   const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [apiEndpoint, setApiEndpoint] = useState<string | null>(null)
 
   const stripeConfig = getStoredStripeConfig()
+
+  useEffect(() => {
+    async function loadEndpoint() {
+      const endpoint = await window.spark.kv.get<string>('stripe-api-endpoint')
+      setApiEndpoint(endpoint || null)
+    }
+    loadEndpoint()
+  }, [])
 
   const handleCheckout = async () => {
     if (!stripeConfig) {
       toast.error('Stripe not configured')
+      onConfigureStripe()
+      return
+    }
+
+    const validation = validateStripeKey(stripeConfig.publishableKey)
+    if (!validation.valid) {
+      toast.error('Invalid Stripe publishable key')
       onConfigureStripe()
       return
     }
@@ -57,37 +84,77 @@ export function StripeCheckout({ open, onOpenChange, userEmail, userId, onSucces
     setIsProcessing(true)
 
     try {
-      const checkoutUrl = await createCheckoutSession(
-        plan.priceId,
-        userEmail,
-        userId,
-        stripeConfig.publishableKey
-      )
+      const config: StripeConfig = {
+        publishableKey: stripeConfig.publishableKey,
+        mode: validation.mode || 'test'
+      }
 
-      if (!checkoutUrl) {
+      const successUrl = `${window.location.origin}${window.location.pathname}#checkout-success`
+      const cancelUrl = `${window.location.origin}${window.location.pathname}#checkout-cancel`
+
+      const session = await createCheckoutSession(config, {
+        priceId: plan.priceId,
+        userId: userId,
+        userEmail: userEmail,
+        successUrl: successUrl,
+        cancelUrl: cancelUrl,
+        mode: 'subscription',
+        metadata: {
+          plan: plan.id,
+          tier: 'pro'
+        }
+      })
+
+      if (!session) {
         throw new Error('Failed to create checkout session')
       }
 
-      toast.success('Opening Stripe Checkout...')
-      
-      setTimeout(() => {
-        const simulateSuccess = window.confirm(
-          'Demo Mode: Simulate successful payment?\n\nIn production, this would redirect to Stripe Checkout.'
-        )
+      if (!apiEndpoint) {
+        toast.info('Demo Mode: Simulating checkout flow', {
+          description: 'Configure API endpoint for real payments'
+        })
         
-        if (simulateSuccess) {
-          onSuccess()
-          toast.success('Payment successful! Welcome to Pro! 🎉')
-        } else {
-          toast.info('Checkout canceled')
-        }
+        setTimeout(async () => {
+          const simulateSuccess = window.confirm(
+            '🧪 Demo Mode Active\n\n' +
+            'No server API configured. Simulate successful payment?\n\n' +
+            'To enable real payments:\n' +
+            '1. Set up the backend server (see STRIPE_SERVER_SETUP.md)\n' +
+            '2. Configure API endpoint in Admin Settings\n\n' +
+            'Simulate payment now?'
+          )
+          
+          if (simulateSuccess) {
+            const subscription = await completeCheckoutSession(session.id, userId)
+            if (subscription) {
+              onSuccess()
+              toast.success('Payment successful! Welcome to Pro! 🎉', {
+                description: 'Your subscription is now active'
+              })
+            } else {
+              toast.error('Failed to complete checkout')
+            }
+          } else {
+            toast.info('Checkout canceled')
+          }
+          
+          setIsProcessing(false)
+        }, 1500)
+      } else {
+        toast.success('Redirecting to Stripe Checkout...', {
+          description: 'You will be redirected to secure payment'
+        })
         
-        setIsProcessing(false)
-      }, 1000)
+        setTimeout(() => {
+          window.location.href = session.url
+        }, 1000)
+      }
 
     } catch (error) {
       console.error('Checkout error:', error)
-      toast.error('Failed to start checkout. Please try again.')
+      toast.error('Failed to start checkout', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      })
       setIsProcessing(false)
     }
   }
@@ -110,8 +177,9 @@ export function StripeCheckout({ open, onOpenChange, userEmail, userId, onSucces
         <div className="space-y-6 mt-4">
           {!stripeConfig && (
             <Card className="p-4 bg-yellow-500/10 border-yellow-500/20">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center gap-3">
+                <Warning weight="fill" className="text-yellow-600" size={20} />
+                <div className="flex-1">
                   <p className="font-medium text-sm">Stripe Not Configured</p>
                   <p className="text-xs text-muted-foreground">
                     Configure Stripe to enable payments
@@ -127,6 +195,20 @@ export function StripeCheckout({ open, onOpenChange, userEmail, userId, onSucces
                 >
                   Configure
                 </Button>
+              </div>
+            </Card>
+          )}
+
+          {stripeConfig && !apiEndpoint && (
+            <Card className="p-4 bg-blue-500/10 border-blue-500/20">
+              <div className="flex items-center gap-3">
+                <Lightning weight="fill" className="text-blue-600" size={20} />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Demo Mode Active</p>
+                  <p className="text-xs text-muted-foreground">
+                    Configure API endpoint in Admin Settings for real payments
+                  </p>
+                </div>
               </div>
             </Card>
           )}
