@@ -421,8 +421,9 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
   }, [gallery, subscriptionStatus, autoRefresh])
 
   useEffect(() => {
-    if (!chatbotInteractions || chatbotInteractions.length === 0) {
+    if ((!chatbotInteractions || chatbotInteractions.length === 0) && !sessionStorage.getItem('chatbot-initialized')) {
       setChatbotInteractions(generateMockChatbotData())
+      sessionStorage.setItem('chatbot-initialized', 'true')
     }
   }, [])
 

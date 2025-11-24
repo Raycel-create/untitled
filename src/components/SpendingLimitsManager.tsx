@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
@@ -237,13 +237,24 @@ export function SpendingLimitsManager({ open, onOpenChange }: SpendingLimitsMana
     })
   }
 
-  const updatedLimits = checkAndResetLimits(currentConfig.limits)
-  if (updatedLimits !== currentConfig.limits) {
-    setConfig(current => ({
-      ...(current ?? initializeSpendingLimits()),
-      limits: updatedLimits
-    }))
-  }
+  useEffect(() => {
+    const updatedLimits = checkAndResetLimits(currentConfig.limits)
+    const needsUpdate = updatedLimits.some((limit, index) => {
+      const originalLimit = currentConfig.limits[index]
+      return originalLimit && (
+        limit.currentSpend !== originalLimit.currentSpend ||
+        limit.startDate !== originalLimit.startDate ||
+        limit.resetDate !== originalLimit.resetDate
+      )
+    })
+    
+    if (needsUpdate) {
+      setConfig(current => ({
+        ...(current ?? initializeSpendingLimits()),
+        limits: updatedLimits
+      }))
+    }
+  }, [currentConfig.limits, setConfig])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

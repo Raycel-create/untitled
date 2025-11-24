@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,8 @@ import {
   getSpendingPercentage,
   isLimitExceeded,
   isApproachingLimit,
-  formatPeriod
+  formatPeriod,
+  shouldResetLimit
 } from '@/lib/spending-limits'
 
 interface SpendingLimitBannerProps {
@@ -20,12 +21,25 @@ interface SpendingLimitBannerProps {
 }
 
 export function SpendingLimitBanner({ onOpenSettings }: SpendingLimitBannerProps) {
-  const [config] = useKV<SpendingLimitsConfig>('spending-limits-config', initializeSpendingLimits())
+  const [config, setConfig] = useKV<SpendingLimitsConfig>('spending-limits-config', initializeSpendingLimits())
   const [dismissed, setDismissed] = useKV<string[]>('spending-limit-dismissed-banners', [])
+
+  useEffect(() => {
+    const currentConfig = config ?? initializeSpendingLimits()
+    const needsReset = currentConfig.limits.some(limit => limit.enabled && shouldResetLimit(limit))
+    
+    if (needsReset) {
+      const resetLimits = checkAndResetLimits(currentConfig.limits)
+      setConfig({
+        ...currentConfig,
+        limits: resetLimits
+      })
+    }
+  }, [config, setConfig])
 
   const { displayLimit, isExceeded, percentage } = useMemo(() => {
     const currentConfig = config ?? initializeSpendingLimits()
-    const activeLimits = checkAndResetLimits(currentConfig.limits.filter(l => l.enabled))
+    const activeLimits = currentConfig.limits.filter(l => l.enabled)
     
     const exceededLimits = activeLimits.filter(limit => isLimitExceeded(limit))
     const approachingLimits = activeLimits.filter(limit => 
