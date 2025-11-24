@@ -166,6 +166,7 @@ function App() {
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [paymentSettingsOpen, setPaymentSettingsOpen] = useState(false)
   const [spendingLimitsOpen, setSpendingLimitsOpen] = useState(false)
+  const [hasInitialized, setHasInitialized] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -178,7 +179,16 @@ function App() {
   const isCEOMode = isAdminSessionValid(adminSession ?? null)
 
   useEffect(() => {
-    setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
+    if (!hasInitialized && subscriptionStatus) {
+      const resetStatus = resetMonthlyUsage(subscriptionStatus)
+      if (resetStatus !== subscriptionStatus) {
+        setSubscriptionStatus(resetStatus)
+      }
+      setHasInitialized(true)
+    }
+  }, [hasInitialized, subscriptionStatus, setSubscriptionStatus])
+
+  useEffect(() => {
     initializeStripeConfig()
 
     const handleOpenStripeConfig = () => {
