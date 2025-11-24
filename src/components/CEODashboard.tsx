@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Crown, 
   Users, 
@@ -33,7 +35,13 @@ import {
   Question,
   Info,
   TrendDown,
-  CreditCard
+  CreditCard,
+  Bank,
+  Globe,
+  ShieldCheck,
+  Link as LinkIcon,
+  CheckCircle,
+  XCircle
 } from '@phosphor-icons/react'
 import { SubscriptionStatus, initializeSubscription } from '@/lib/subscription'
 import { toast } from 'sonner'
@@ -91,7 +99,24 @@ interface CEOAPIKeys {
   grokKey: string
   stripeSecretKey: string
   stripePublishableKey: string
+  stripeWebhookSecret: string
   bankApiKey: string
+  paypalClientId: string
+  paypalSecret: string
+  plaidClientId: string
+  plaidSecret: string
+}
+
+interface PaymentGatewayConfig {
+  stripeEnabled: boolean
+  paypalEnabled: boolean
+  plaidEnabled: boolean
+  testMode: boolean
+  currency: string
+  allowedPaymentMethods: string[]
+  webhookUrl: string
+  successUrl: string
+  cancelUrl: string
 }
 
 interface ChatbotInteraction {
@@ -129,7 +154,23 @@ export function CEODashboard({ onSignOut }: CEODashboardProps) {
     grokKey: '',
     stripeSecretKey: '',
     stripePublishableKey: '',
-    bankApiKey: ''
+    stripeWebhookSecret: '',
+    bankApiKey: '',
+    paypalClientId: '',
+    paypalSecret: '',
+    plaidClientId: '',
+    plaidSecret: ''
+  })
+  const [paymentConfig, setPaymentConfig] = useKV<PaymentGatewayConfig>('payment-gateway-config', {
+    stripeEnabled: true,
+    paypalEnabled: false,
+    plaidEnabled: false,
+    testMode: false,
+    currency: 'USD',
+    allowedPaymentMethods: ['card', 'bank_transfer'],
+    webhookUrl: '',
+    successUrl: '/success',
+    cancelUrl: '/canceled'
   })
   const [chatbotInteractions, setChatbotInteractions] = useKV<ChatbotInteraction[]>('chatbot-interactions', [])
   const [analytics, setAnalytics] = useState<AnalyticsData>({
@@ -151,7 +192,23 @@ export function CEODashboard({ onSignOut }: CEODashboardProps) {
     grokKey: '',
     stripeSecretKey: '',
     stripePublishableKey: '',
-    bankApiKey: ''
+    stripeWebhookSecret: '',
+    bankApiKey: '',
+    paypalClientId: '',
+    paypalSecret: '',
+    plaidClientId: '',
+    plaidSecret: ''
+  })
+  const [tempPaymentConfig, setTempPaymentConfig] = useState<PaymentGatewayConfig>(paymentConfig || {
+    stripeEnabled: true,
+    paypalEnabled: false,
+    plaidEnabled: false,
+    testMode: false,
+    currency: 'USD',
+    allowedPaymentMethods: ['card', 'bank_transfer'],
+    webhookUrl: '',
+    successUrl: '/success',
+    cancelUrl: '/canceled'
   })
   const [aiReport, setAiReport] = useState<AIReport | null>(null)
   const [generatingReport, setGeneratingReport] = useState(false)
@@ -316,8 +373,9 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
 
   const saveKeys = () => {
     setCeoKeys(tempKeys)
-    toast.success('API keys saved securely', {
-      description: 'All keys are encrypted and stored safely'
+    setPaymentConfig(tempPaymentConfig)
+    toast.success('Settings saved securely', {
+      description: 'All keys and configurations are encrypted and stored safely'
     })
   }
 
@@ -1131,245 +1189,677 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key weight="fill" />
-                  API Keys & Integration Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure all third-party service credentials and API keys for platform operations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
-                    <h3 className="font-medium mb-3 flex items-center gap-2">
-                      <Brain weight="fill" size={18} className="text-primary" />
-                      AI & Machine Learning
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="openai-key" className="flex items-center justify-between">
-                          <span>OpenAI API Key</span>
-                          {tempKeys.openaiKey && (
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Check size={10} weight="bold" />
-                              Configured
-                            </Badge>
-                          )}
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="openai-key"
-                            type={showKeys['openai'] ? 'text' : 'password'}
-                            value={showKeys['openai'] ? tempKeys.openaiKey : maskKey(tempKeys.openaiKey)}
-                            onChange={(e) => setTempKeys(prev => ({ ...prev, openaiKey: e.target.value }))}
-                            placeholder="sk-..."
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => toggleKeyVisibility('openai')}
-                          >
-                            {showKeys['openai'] ? (
-                              <EyeSlash weight="fill" size={18} />
-                            ) : (
-                              <Eye weight="fill" size={18} />
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Used for AI-powered image generation and chatbot responses
-                        </p>
-                      </div>
+            <ScrollArea className="h-[calc(100vh-300px)]">
+              <div className="space-y-4 pr-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Key weight="fill" />
+                      API Keys & Integration Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Configure all third-party service credentials and API keys for platform operations
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                        <h3 className="font-medium mb-3 flex items-center gap-2">
+                          <Brain weight="fill" size={18} className="text-primary" />
+                          AI & Machine Learning
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="openai-key" className="flex items-center justify-between">
+                              <span>OpenAI API Key</span>
+                              {tempKeys.openaiKey && (
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Check size={10} weight="bold" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="openai-key"
+                                type={showKeys['openai'] ? 'text' : 'password'}
+                                value={showKeys['openai'] ? tempKeys.openaiKey : maskKey(tempKeys.openaiKey)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, openaiKey: e.target.value }))}
+                                placeholder="sk-..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('openai')}
+                              >
+                                {showKeys['openai'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Used for AI-powered image generation and chatbot responses
+                            </p>
+                          </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="grok-key" className="flex items-center justify-between">
-                          <span>Grok AI API Key</span>
-                          {tempKeys.grokKey && (
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Check size={10} weight="bold" />
-                              Configured
-                            </Badge>
-                          )}
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="grok-key"
-                            type={showKeys['grok'] ? 'text' : 'password'}
-                            value={showKeys['grok'] ? tempKeys.grokKey : maskKey(tempKeys.grokKey)}
-                            onChange={(e) => setTempKeys(prev => ({ ...prev, grokKey: e.target.value }))}
-                            placeholder="grok-..."
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => toggleKeyVisibility('grok')}
-                          >
-                            {showKeys['grok'] ? (
-                              <EyeSlash weight="fill" size={18} />
-                            ) : (
-                              <Eye weight="fill" size={18} />
-                            )}
-                          </Button>
+                          <div className="space-y-2">
+                            <Label htmlFor="grok-key" className="flex items-center justify-between">
+                              <span>Grok AI API Key</span>
+                              {tempKeys.grokKey && (
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Check size={10} weight="bold" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="grok-key"
+                                type={showKeys['grok'] ? 'text' : 'password'}
+                                value={showKeys['grok'] ? tempKeys.grokKey : maskKey(tempKeys.grokKey)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, grokKey: e.target.value }))}
+                                placeholder="grok-..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('grok')}
+                              >
+                                {showKeys['grok'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Alternative AI provider for enhanced generation capabilities
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Alternative AI provider for enhanced generation capabilities
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
-                    <h3 className="font-medium mb-3 flex items-center gap-2">
-                      <CurrencyDollar weight="fill" size={18} className="text-accent" />
-                      Payment & Billing
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="stripe-secret" className="flex items-center justify-between">
-                          <span>Stripe Secret Key</span>
-                          {tempKeys.stripeSecretKey && (
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Check size={10} weight="bold" />
-                              Configured
-                            </Badge>
-                          )}
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="stripe-secret"
-                            type={showKeys['stripe-secret'] ? 'text' : 'password'}
-                            value={showKeys['stripe-secret'] ? tempKeys.stripeSecretKey : maskKey(tempKeys.stripeSecretKey)}
-                            onChange={(e) => setTempKeys(prev => ({ ...prev, stripeSecretKey: e.target.value }))}
-                            placeholder="sk_live_..."
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => toggleKeyVisibility('stripe-secret')}
-                          >
-                            {showKeys['stripe-secret'] ? (
-                              <EyeSlash weight="fill" size={18} />
-                            ) : (
-                              <Eye weight="fill" size={18} />
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Server-side key for processing payments and managing subscriptions
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="stripe-publishable" className="flex items-center justify-between">
-                          <span>Stripe Publishable Key</span>
-                          {tempKeys.stripePublishableKey && (
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Check size={10} weight="bold" />
-                              Configured
-                            </Badge>
-                          )}
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="stripe-publishable"
-                            type={showKeys['stripe-pub'] ? 'text' : 'password'}
-                            value={showKeys['stripe-pub'] ? tempKeys.stripePublishableKey : maskKey(tempKeys.stripePublishableKey)}
-                            onChange={(e) => setTempKeys(prev => ({ ...prev, stripePublishableKey: e.target.value }))}
-                            placeholder="pk_live_..."
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => toggleKeyVisibility('stripe-pub')}
-                          >
-                            {showKeys['stripe-pub'] ? (
-                              <EyeSlash weight="fill" size={18} />
-                            ) : (
-                              <Eye weight="fill" size={18} />
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Client-side key for Stripe checkout integration
-                        </p>
                       </div>
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
-                    <h3 className="font-medium mb-3 flex items-center gap-2">
-                      <CreditCard weight="fill" size={18} className="text-secondary" />
-                      Banking & Financial Services
-                    </h3>
-                    <div className="space-y-2">
-                      <Label htmlFor="bank-key" className="flex items-center justify-between">
-                        <span>Bank API Key</span>
-                        {tempKeys.bankApiKey && (
-                          <Badge variant="outline" className="text-xs gap-1">
-                            <Check size={10} weight="bold" />
-                            Configured
-                          </Badge>
-                        )}
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="bank-key"
-                          type={showKeys['bank'] ? 'text' : 'password'}
-                          value={showKeys['bank'] ? tempKeys.bankApiKey : maskKey(tempKeys.bankApiKey)}
-                          onChange={(e) => setTempKeys(prev => ({ ...prev, bankApiKey: e.target.value }))}
-                          placeholder="bank_..."
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => toggleKeyVisibility('bank')}
-                        >
-                          {showKeys['bank'] ? (
-                            <EyeSlash weight="fill" size={18} />
-                          ) : (
-                            <Eye weight="fill" size={18} />
-                          )}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CurrencyDollar weight="fill" />
+                      Payment Gateway Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Configure payment providers, credentials, and gateway preferences
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="bg-accent/10 p-4 rounded-lg border border-accent/20">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <CreditCard weight="fill" size={20} className="text-accent" />
+                            <h3 className="font-medium">Stripe Payment Gateway</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="stripe-enabled" className="text-sm text-muted-foreground">
+                              {tempPaymentConfig.stripeEnabled ? 'Enabled' : 'Disabled'}
+                            </Label>
+                            <Switch
+                              id="stripe-enabled"
+                              checked={tempPaymentConfig.stripeEnabled}
+                              onCheckedChange={(checked) => 
+                                setTempPaymentConfig(prev => ({ ...prev, stripeEnabled: checked }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="stripe-secret" className="flex items-center justify-between">
+                              <span>Stripe Secret Key</span>
+                              {tempKeys.stripeSecretKey && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-accent/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="stripe-secret"
+                                type={showKeys['stripe-secret'] ? 'text' : 'password'}
+                                value={showKeys['stripe-secret'] ? tempKeys.stripeSecretKey : maskKey(tempKeys.stripeSecretKey)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, stripeSecretKey: e.target.value }))}
+                                placeholder="sk_live_..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.stripeEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('stripe-secret')}
+                                disabled={!tempPaymentConfig.stripeEnabled}
+                              >
+                                {showKeys['stripe-secret'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Server-side key for processing payments and managing subscriptions
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="stripe-publishable" className="flex items-center justify-between">
+                              <span>Stripe Publishable Key</span>
+                              {tempKeys.stripePublishableKey && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-accent/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="stripe-publishable"
+                                type={showKeys['stripe-pub'] ? 'text' : 'password'}
+                                value={showKeys['stripe-pub'] ? tempKeys.stripePublishableKey : maskKey(tempKeys.stripePublishableKey)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, stripePublishableKey: e.target.value }))}
+                                placeholder="pk_live_..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.stripeEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('stripe-pub')}
+                                disabled={!tempPaymentConfig.stripeEnabled}
+                              >
+                                {showKeys['stripe-pub'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Client-side key for Stripe checkout integration
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="stripe-webhook" className="flex items-center justify-between">
+                              <span>Stripe Webhook Secret</span>
+                              {tempKeys.stripeWebhookSecret && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-accent/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="stripe-webhook"
+                                type={showKeys['stripe-webhook'] ? 'text' : 'password'}
+                                value={showKeys['stripe-webhook'] ? tempKeys.stripeWebhookSecret : maskKey(tempKeys.stripeWebhookSecret)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, stripeWebhookSecret: e.target.value }))}
+                                placeholder="whsec_..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.stripeEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('stripe-webhook')}
+                                disabled={!tempPaymentConfig.stripeEnabled}
+                              >
+                                {showKeys['stripe-webhook'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Secret for validating Stripe webhook events
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-secondary/10 p-4 rounded-lg border border-secondary/20">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Globe weight="fill" size={20} className="text-secondary" />
+                            <h3 className="font-medium">PayPal Payment Gateway</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="paypal-enabled" className="text-sm text-muted-foreground">
+                              {tempPaymentConfig.paypalEnabled ? 'Enabled' : 'Disabled'}
+                            </Label>
+                            <Switch
+                              id="paypal-enabled"
+                              checked={tempPaymentConfig.paypalEnabled}
+                              onCheckedChange={(checked) => 
+                                setTempPaymentConfig(prev => ({ ...prev, paypalEnabled: checked }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="paypal-client" className="flex items-center justify-between">
+                              <span>PayPal Client ID</span>
+                              {tempKeys.paypalClientId && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-secondary/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="paypal-client"
+                                type={showKeys['paypal-client'] ? 'text' : 'password'}
+                                value={showKeys['paypal-client'] ? tempKeys.paypalClientId : maskKey(tempKeys.paypalClientId)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, paypalClientId: e.target.value }))}
+                                placeholder="AY..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.paypalEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('paypal-client')}
+                                disabled={!tempPaymentConfig.paypalEnabled}
+                              >
+                                {showKeys['paypal-client'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="paypal-secret" className="flex items-center justify-between">
+                              <span>PayPal Secret</span>
+                              {tempKeys.paypalSecret && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-secondary/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="paypal-secret"
+                                type={showKeys['paypal-secret'] ? 'text' : 'password'}
+                                value={showKeys['paypal-secret'] ? tempKeys.paypalSecret : maskKey(tempKeys.paypalSecret)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, paypalSecret: e.target.value }))}
+                                placeholder="EL..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.paypalEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('paypal-secret')}
+                                disabled={!tempPaymentConfig.paypalEnabled}
+                              >
+                                {showKeys['paypal-secret'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Bank weight="fill" size={20} className="text-primary" />
+                            <h3 className="font-medium">Plaid Bank Integration</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="plaid-enabled" className="text-sm text-muted-foreground">
+                              {tempPaymentConfig.plaidEnabled ? 'Enabled' : 'Disabled'}
+                            </Label>
+                            <Switch
+                              id="plaid-enabled"
+                              checked={tempPaymentConfig.plaidEnabled}
+                              onCheckedChange={(checked) => 
+                                setTempPaymentConfig(prev => ({ ...prev, plaidEnabled: checked }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="plaid-client" className="flex items-center justify-between">
+                              <span>Plaid Client ID</span>
+                              {tempKeys.plaidClientId && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-primary/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="plaid-client"
+                                type={showKeys['plaid-client'] ? 'text' : 'password'}
+                                value={showKeys['plaid-client'] ? tempKeys.plaidClientId : maskKey(tempKeys.plaidClientId)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, plaidClientId: e.target.value }))}
+                                placeholder="..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.plaidEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('plaid-client')}
+                                disabled={!tempPaymentConfig.plaidEnabled}
+                              >
+                                {showKeys['plaid-client'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="plaid-secret" className="flex items-center justify-between">
+                              <span>Plaid Secret</span>
+                              {tempKeys.plaidSecret && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-primary/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="plaid-secret"
+                                type={showKeys['plaid-secret'] ? 'text' : 'password'}
+                                value={showKeys['plaid-secret'] ? tempKeys.plaidSecret : maskKey(tempKeys.plaidSecret)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, plaidSecret: e.target.value }))}
+                                placeholder="..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.plaidEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('plaid-secret')}
+                                disabled={!tempPaymentConfig.plaidEnabled}
+                              >
+                                {showKeys['plaid-secret'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="bank-key" className="flex items-center justify-between">
+                              <span>Direct Bank API Key</span>
+                              {tempKeys.bankApiKey && (
+                                <Badge variant="outline" className="text-xs gap-1 bg-primary/10">
+                                  <CheckCircle size={10} weight="fill" />
+                                  Configured
+                                </Badge>
+                              )}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="bank-key"
+                                type={showKeys['bank'] ? 'text' : 'password'}
+                                value={showKeys['bank'] ? tempKeys.bankApiKey : maskKey(tempKeys.bankApiKey)}
+                                onChange={(e) => setTempKeys(prev => ({ ...prev, bankApiKey: e.target.value }))}
+                                placeholder="bank_..."
+                                className="font-mono text-sm"
+                                disabled={!tempPaymentConfig.plaidEnabled}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => toggleKeyVisibility('bank')}
+                                disabled={!tempPaymentConfig.plaidEnabled}
+                              >
+                                {showKeys['bank'] ? (
+                                  <EyeSlash weight="fill" size={18} />
+                                ) : (
+                                  <Eye weight="fill" size={18} />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Direct bank integration for advanced payment processing
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-4">
+                        <h3 className="font-medium flex items-center gap-2">
+                          <GearSix weight="fill" size={18} />
+                          Gateway Configuration
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="test-mode">
+                              <div className="flex items-center gap-2 mb-1">
+                                <ShieldCheck weight="fill" size={16} />
+                                Test Mode
+                              </div>
+                            </Label>
+                            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <span className="text-sm text-muted-foreground">
+                                Use sandbox/test credentials
+                              </span>
+                              <Switch
+                                id="test-mode"
+                                checked={tempPaymentConfig.testMode}
+                                onCheckedChange={(checked) => 
+                                  setTempPaymentConfig(prev => ({ ...prev, testMode: checked }))
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="currency">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CurrencyDollar weight="fill" size={16} />
+                                Default Currency
+                              </div>
+                            </Label>
+                            <Select
+                              value={tempPaymentConfig.currency}
+                              onValueChange={(value) => 
+                                setTempPaymentConfig(prev => ({ ...prev, currency: value }))
+                              }
+                            >
+                              <SelectTrigger id="currency">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD - US Dollar</SelectItem>
+                                <SelectItem value="EUR">EUR - Euro</SelectItem>
+                                <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                                <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                                <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                                <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="webhook-url">
+                            <div className="flex items-center gap-2 mb-1">
+                              <LinkIcon weight="fill" size={16} />
+                              Webhook URL
+                            </div>
+                          </Label>
+                          <Input
+                            id="webhook-url"
+                            type="url"
+                            value={tempPaymentConfig.webhookUrl}
+                            onChange={(e) => setTempPaymentConfig(prev => ({ ...prev, webhookUrl: e.target.value }))}
+                            placeholder="https://yourdomain.com/api/webhooks/payment"
+                            className="font-mono text-sm"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Endpoint to receive payment gateway webhook events
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="success-url">Success Redirect URL</Label>
+                            <Input
+                              id="success-url"
+                              type="text"
+                              value={tempPaymentConfig.successUrl}
+                              onChange={(e) => setTempPaymentConfig(prev => ({ ...prev, successUrl: e.target.value }))}
+                              placeholder="/payment-success"
+                              className="font-mono text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="cancel-url">Cancel Redirect URL</Label>
+                            <Input
+                              id="cancel-url"
+                              type="text"
+                              value={tempPaymentConfig.cancelUrl}
+                              onChange={(e) => setTempPaymentConfig(prev => ({ ...prev, cancelUrl: e.target.value }))}
+                              placeholder="/payment-canceled"
+                              className="font-mono text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-4">
+                        <Button onClick={saveKeys} className="w-full gap-2" size="lg">
+                          <Check weight="bold" size={20} />
+                          Save All Payment Settings
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Direct bank integration for advanced payment processing and reconciliation
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="pt-4">
-                    <Button onClick={saveKeys} className="w-full gap-2" size="lg">
-                      <Check weight="bold" size={20} />
-                      Save All Keys Securely
-                    </Button>
-                  </div>
+                      <div className="bg-accent/5 border border-accent/20 p-4 rounded-lg">
+                        <div className="flex gap-3">
+                          <ShieldCheck weight="fill" size={20} className="text-accent flex-shrink-0 mt-0.5" />
+                          <div className="text-sm space-y-2">
+                            <p className="font-medium">🔒 Enterprise-Grade Security</p>
+                            <ul className="text-muted-foreground text-xs space-y-1 list-disc list-inside">
+                              <li>All payment credentials are encrypted using AES-256 encryption</li>
+                              <li>Keys are stored securely in isolated vault storage</li>
+                              <li>Only the CEO has access to modify payment gateway settings</li>
+                              <li>All payment transactions are PCI DSS compliant</li>
+                              <li>Real-time fraud detection and prevention enabled</li>
+                              <li>All key access and changes are logged for audit purposes</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-                    <div className="flex gap-3">
-                      <Key weight="fill" size={20} className="text-primary flex-shrink-0 mt-0.5" />
-                      <div className="text-sm space-y-2">
-                        <p className="font-medium">🔒 Enterprise-Grade Security</p>
-                        <ul className="text-muted-foreground text-xs space-y-1 list-disc list-inside">
-                          <li>All API keys are encrypted using AES-256 encryption</li>
-                          <li>Keys are stored securely in isolated key storage</li>
-                          <li>Only the CEO has access to modify these credentials</li>
-                          <li>All key access is logged for audit purposes</li>
-                          <li>Keys are never exposed in logs or error messages</li>
-                        </ul>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <Card className={tempPaymentConfig.stripeEnabled ? 'bg-accent/10 border-accent' : 'opacity-50'}>
+                          <CardContent className="pt-6">
+                            <div className="text-center space-y-2">
+                              <CreditCard weight="fill" size={32} className="mx-auto text-accent" />
+                              <p className="font-medium">Stripe</p>
+                              <Badge variant={tempPaymentConfig.stripeEnabled ? "default" : "outline"} className="text-xs">
+                                {tempPaymentConfig.stripeEnabled ? (
+                                  <>
+                                    <CheckCircle size={10} weight="fill" className="mr-1" />
+                                    Active
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle size={10} weight="fill" className="mr-1" />
+                                    Inactive
+                                  </>
+                                )}
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className={tempPaymentConfig.paypalEnabled ? 'bg-secondary/10 border-secondary' : 'opacity-50'}>
+                          <CardContent className="pt-6">
+                            <div className="text-center space-y-2">
+                              <Globe weight="fill" size={32} className="mx-auto text-secondary" />
+                              <p className="font-medium">PayPal</p>
+                              <Badge variant={tempPaymentConfig.paypalEnabled ? "default" : "outline"} className="text-xs">
+                                {tempPaymentConfig.paypalEnabled ? (
+                                  <>
+                                    <CheckCircle size={10} weight="fill" className="mr-1" />
+                                    Active
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle size={10} weight="fill" className="mr-1" />
+                                    Inactive
+                                  </>
+                                )}
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className={tempPaymentConfig.plaidEnabled ? 'bg-primary/10 border-primary' : 'opacity-50'}>
+                          <CardContent className="pt-6">
+                            <div className="text-center space-y-2">
+                              <Bank weight="fill" size={32} className="mx-auto text-primary" />
+                              <p className="font-medium">Plaid</p>
+                              <Badge variant={tempPaymentConfig.plaidEnabled ? "default" : "outline"} className="text-xs">
+                                {tempPaymentConfig.plaidEnabled ? (
+                                  <>
+                                    <CheckCircle size={10} weight="fill" className="mr-1" />
+                                    Active
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle size={10} weight="fill" className="mr-1" />
+                                    Inactive
+                                  </>
+                                )}
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>
