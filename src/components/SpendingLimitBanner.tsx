@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,29 +23,39 @@ export function SpendingLimitBanner({ onOpenSettings }: SpendingLimitBannerProps
   const [config] = useKV<SpendingLimitsConfig>('spending-limits-config', initializeSpendingLimits())
   const [dismissed, setDismissed] = useKV<string[]>('spending-limit-dismissed-banners', [])
 
-  const currentConfig = config ?? initializeSpendingLimits()
-  const activeLimits = checkAndResetLimits(currentConfig.limits.filter(l => l.enabled))
-  
-  const exceededLimits = activeLimits.filter(limit => isLimitExceeded(limit))
-  const approachingLimits = activeLimits.filter(limit => 
-    !isLimitExceeded(limit) && isApproachingLimit(limit)
-  )
+  const { displayLimit, isExceeded, percentage } = useMemo(() => {
+    const currentConfig = config ?? initializeSpendingLimits()
+    const activeLimits = checkAndResetLimits(currentConfig.limits.filter(l => l.enabled))
+    
+    const exceededLimits = activeLimits.filter(limit => isLimitExceeded(limit))
+    const approachingLimits = activeLimits.filter(limit => 
+      !isLimitExceeded(limit) && isApproachingLimit(limit)
+    )
 
-  const criticalLimit = exceededLimits[0]
-  const warningLimit = !criticalLimit ? approachingLimits[0] : null
-  const displayLimit = criticalLimit || warningLimit
+    const criticalLimit = exceededLimits[0]
+    const warningLimit = !criticalLimit ? approachingLimits[0] : null
+    const limit = criticalLimit || warningLimit
+
+    if (!limit) {
+      return { displayLimit: null, isExceeded: false, percentage: 0 }
+    }
+
+    const isDismissed = (dismissed ?? []).includes(limit.id)
+    if (isDismissed) {
+      return { displayLimit: null, isExceeded: false, percentage: 0 }
+    }
+
+    return {
+      displayLimit: limit,
+      isExceeded: isLimitExceeded(limit),
+      percentage: getSpendingPercentage(limit.currentSpend, limit.amount)
+    }
+  }, [config, dismissed])
 
   if (!displayLimit) return null
 
-  const limitId = displayLimit.id
-  const isDismissed = (dismissed ?? []).includes(limitId)
-  if (isDismissed) return null
-
-  const percentage = getSpendingPercentage(displayLimit.currentSpend, displayLimit.amount)
-  const isExceeded = isLimitExceeded(displayLimit)
-
   const handleDismiss = () => {
-    setDismissed(current => [...(current ?? []), limitId])
+    setDismissed(current => [...(current ?? []), displayLimit.id])
   }
 
   return (
