@@ -149,6 +149,7 @@ export function checkAndResetLimits(limits: SpendingLimit[]): SpendingLimit[] {
 }
 
 export function getSpendingPercentage(currentSpend: number, limit: number): number {
+  if (limit === 0) return 0
   return Math.min(100, Math.round((currentSpend / limit) * 100))
 }
 

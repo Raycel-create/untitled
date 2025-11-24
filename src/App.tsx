@@ -651,7 +651,7 @@ function App() {
               
               if (currentEmailConfig.enabled && currentEmailConfig.recipientEmail && alert.channels.includes('email')) {
                 try {
-                  let emailNotification: EmailNotification
+                  let emailNotification: EmailNotification | null = null
                   
                   if (alert.percentage !== undefined) {
                     const limit = updatedConfig.limits.find(l => l.alerts.some(a => a.id === alert.id))
@@ -680,11 +680,13 @@ function App() {
                     )
                   }
                   
-                  setEmailHistory(current => [emailNotification, ...(current ?? [])].slice(0, 50))
-                  
-                  toast.info('Email alert sent', {
-                    description: `Notification sent to ${currentEmailConfig.recipientEmail}`
-                  })
+                  if (emailNotification) {
+                    setEmailHistory(current => [emailNotification!, ...(current ?? [])].slice(0, 50))
+                    
+                    toast.info('Email alert sent', {
+                      description: `Notification sent to ${currentEmailConfig.recipientEmail}`
+                    })
+                  }
                 } catch (error) {
                   console.error('Failed to send email alert:', error)
                 }
@@ -759,7 +761,7 @@ function App() {
             
             if (currentEmailConfig.enabled && currentEmailConfig.recipientEmail && alert.channels.includes('email')) {
               try {
-                let emailNotification: EmailNotification
+                let emailNotification: EmailNotification | null = null
                 
                 if (alert.percentage !== undefined) {
                   const limit = updatedConfig.limits.find(l => l.alerts.some(a => a.id === alert.id))
@@ -788,11 +790,13 @@ function App() {
                   )
                 }
                 
-                setEmailHistory(current => [emailNotification, ...(current ?? [])].slice(0, 50))
-                
-                toast.info('Email alert sent', {
-                  description: `Notification sent to ${currentEmailConfig.recipientEmail}`
-                })
+                if (emailNotification) {
+                  setEmailHistory(current => [emailNotification!, ...(current ?? [])].slice(0, 50))
+                  
+                  toast.info('Email alert sent', {
+                    description: `Notification sent to ${currentEmailConfig.recipientEmail}`
+                  })
+                }
               } catch (error) {
                 console.error('Failed to send email alert:', error)
               }
@@ -1596,7 +1600,7 @@ function App() {
                 </div>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-2 base:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredGallery.map((item) => (
                   <Card
                     key={item.id}

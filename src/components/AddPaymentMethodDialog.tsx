@@ -95,14 +95,31 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onAddMethod }: AddP
         toast.error('Please fill in all bank account details')
         return
       }
+      if (routingNumber.length !== 9) {
+        toast.error('Routing number must be exactly 9 digits')
+        return
+      }
+      if (accountNumber.length < 4) {
+        toast.error('Please enter a valid account number')
+        return
+      }
     } else if (methodType === 'paypal') {
       if (!paypalEmail) {
         toast.error('Please enter your PayPal email')
         return
       }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(paypalEmail)) {
+        toast.error('Please enter a valid email address')
+        return
+      }
     } else if (methodType === 'crypto') {
       if (!walletAddress) {
         toast.error('Please enter your wallet address')
+        return
+      }
+      if (walletAddress.length < 26) {
+        toast.error('Please enter a valid wallet address')
         return
       }
     }

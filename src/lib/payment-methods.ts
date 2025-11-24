@@ -101,7 +101,7 @@ export const isCardExpiringSoon = (month: number, year: number): boolean => {
 export const formatAmount = (amount: number, currency: string): string => {
   const currencyInfo = SUPPORTED_CURRENCIES.find(c => c.code === currency)
   const symbol = currencyInfo?.symbol || '$'
-  return `${symbol}${(amount / 100).toFixed(2)}`
+  return `${symbol}${amount.toFixed(2)}`
 }
 
 export const getPaymentMethodIcon = (type: PaymentMethod['type']): string => {
@@ -126,7 +126,7 @@ export const generateMockPaymentHistory = (count: number = 5): PaymentHistory[] 
   
   return Array.from({ length: count }, (_, i) => ({
     id: `pi_${Math.random().toString(36).substr(2, 24)}`,
-    amount: Math.floor(Math.random() * 10000) + 999,
+    amount: Math.floor(Math.random() * 100) + 9.99,
     currency: 'USD',
     status: statuses[i % statuses.length],
     description: descriptions[i % descriptions.length],
