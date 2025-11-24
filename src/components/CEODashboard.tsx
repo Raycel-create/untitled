@@ -32,7 +32,8 @@ import {
   Warning,
   Question,
   Info,
-  TrendDown
+  TrendDown,
+  CreditCard
 } from '@phosphor-icons/react'
 import { SubscriptionStatus, initializeSubscription } from '@/lib/subscription'
 import { toast } from 'sonner'
@@ -154,6 +155,8 @@ export function CEODashboard({ onSignOut }: CEODashboardProps) {
   })
   const [aiReport, setAiReport] = useState<AIReport | null>(null)
   const [generatingReport, setGeneratingReport] = useState(false)
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [lastUpdated, setLastUpdated] = useState(new Date())
 
   const generateTimeSeriesData = () => {
     const days = 30
@@ -307,6 +310,7 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
 
   const maskKey = (key: string) => {
     if (!key) return '••••••••••••••••'
+    if (key.length <= 12) return '••••••••••••••••'
     return key.substring(0, 8) + '••••••••••••' + key.substring(key.length - 4)
   }
 
@@ -316,6 +320,13 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
       description: 'All keys are encrypted and stored safely'
     })
   }
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const updateAnalytics = () => {
@@ -340,12 +351,13 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
       })
 
       setTimeSeriesData(generateTimeSeriesData())
+      setLastUpdated(new Date())
     }
 
     updateAnalytics()
 
     if (autoRefresh) {
-      const interval = setInterval(updateAnalytics, 5000)
+      const interval = setInterval(updateAnalytics, 3000)
       return () => clearInterval(interval)
     }
   }, [gallery, subscriptionStatus, autoRefresh])
@@ -373,17 +385,35 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <header className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-gradient-to-r from-primary to-accent p-3 rounded-xl">
                 <Crown weight="fill" size={32} className="text-primary-foreground" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">CEO Dashboard</h1>
-                <p className="text-muted-foreground">Executive Overview & Analytics</p>
+                <p className="text-muted-foreground">Real-time Executive Overview & Analytics</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <div className="text-right mr-2">
+                <div className="text-sm font-medium">
+                  {currentTime.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true 
+                  })}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {currentTime.toLocaleDateString('en-US', { 
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </div>
+              </div>
               <Button
                 variant={autoRefresh ? "default" : "outline"}
                 onClick={() => setAutoRefresh(!autoRefresh)}
@@ -403,6 +433,19 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
               </Button>
             </div>
           </div>
+          {autoRefresh && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                <span>Live updates enabled</span>
+              </div>
+              <span>•</span>
+              <span>Last updated: {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
+          )}
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -832,7 +875,7 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
                       24/7 AI Chatbot Analytics
                     </CardTitle>
                     <CardDescription>
-                      Comprehensive analysis of customer support interactions handled by AI
+                      Real-time customer support interactions handled by AI agents
                     </CardDescription>
                   </div>
                   <Button
@@ -843,7 +886,7 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
                     {generatingReport ? (
                       <>
                         <div className="animate-spin">⟳</div>
-                        Generating...
+                        Analyzing...
                       </>
                     ) : (
                       <>
@@ -857,10 +900,23 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
               <CardContent>
                 {!aiReport ? (
                   <div className="text-center py-12">
-                    <Brain size={48} weight="thin" className="text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">
-                      Click "Generate Report" to analyze chatbot interactions
+                    <div className="relative inline-block mb-4">
+                      <Brain size={48} weight="thin" className="text-muted-foreground" />
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-primary"></span>
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground mb-2 font-medium">
+                      AI Chatbot Active 24/7
                     </p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Click "Generate Report" to analyze recent interactions
+                    </p>
+                    <Badge variant="outline" className="gap-1">
+                      <ChatCircleDots weight="fill" size={12} />
+                      {(chatbotInteractions?.length || 0)} interactions recorded
+                    </Badge>
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -1005,6 +1061,69 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
                         </CardContent>
                       </Card>
                     </div>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Recent Chatbot Interactions</CardTitle>
+                        <CardDescription>Latest customer support conversations</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ScrollArea className="h-[400px]">
+                          <div className="space-y-3">
+                            {(chatbotInteractions || []).slice(0, 10).map((interaction) => (
+                              <div key={interaction.id} className="p-3 bg-muted/30 rounded-lg border border-border">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Badge 
+                                      variant="outline" 
+                                      className={
+                                        interaction.type === 'complaint' 
+                                          ? 'bg-destructive/10 text-destructive border-destructive/20'
+                                          : interaction.type === 'question'
+                                          ? 'bg-secondary/10 text-secondary-foreground border-secondary/20'
+                                          : 'bg-accent/10 text-accent-foreground border-accent/20'
+                                      }
+                                    >
+                                      {interaction.type === 'complaint' && <Warning weight="fill" size={10} />}
+                                      {interaction.type === 'question' && <Question weight="fill" size={10} />}
+                                      {interaction.type === 'inquiry' && <Info weight="fill" size={10} />}
+                                      <span className="ml-1 capitalize">{interaction.type}</span>
+                                    </Badge>
+                                    <Badge 
+                                      variant="outline"
+                                      className={
+                                        interaction.sentiment === 'positive'
+                                          ? 'bg-primary/10'
+                                          : interaction.sentiment === 'negative'
+                                          ? 'bg-destructive/10'
+                                          : 'bg-muted'
+                                      }
+                                    >
+                                      {interaction.sentiment}
+                                    </Badge>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(interaction.timestamp).toLocaleTimeString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                                <p className="text-sm mb-2">{interaction.message}</p>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <Badge variant={interaction.resolved ? "default" : "outline"} className="text-xs">
+                                    {interaction.resolved ? '✓ Resolved' : '⏳ Pending'}
+                                  </Badge>
+                                  <span className="text-muted-foreground">User: {interaction.userId}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
               </CardContent>
@@ -1016,159 +1135,235 @@ Provide a 3-4 sentence executive summary highlighting key insights, trends, and 
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key weight="fill" />
-                  API Keys & Credentials
+                  API Keys & Integration Settings
                 </CardTitle>
                 <CardDescription>
-                  Secure configuration for all third-party integrations
+                  Configure all third-party service credentials and API keys for platform operations
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="openai-key">OpenAI API Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="openai-key"
-                        type={showKeys['openai'] ? 'text' : 'password'}
-                        value={showKeys['openai'] ? tempKeys.openaiKey : maskKey(tempKeys.openaiKey)}
-                        onChange={(e) => setTempKeys(prev => ({ ...prev, openaiKey: e.target.value }))}
-                        placeholder="sk-..."
-                        className="font-mono"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => toggleKeyVisibility('openai')}
-                      >
-                        {showKeys['openai'] ? (
-                          <EyeSlash weight="fill" size={18} />
-                        ) : (
-                          <Eye weight="fill" size={18} />
-                        )}
-                      </Button>
+                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                    <h3 className="font-medium mb-3 flex items-center gap-2">
+                      <Brain weight="fill" size={18} className="text-primary" />
+                      AI & Machine Learning
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="openai-key" className="flex items-center justify-between">
+                          <span>OpenAI API Key</span>
+                          {tempKeys.openaiKey && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Check size={10} weight="bold" />
+                              Configured
+                            </Badge>
+                          )}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="openai-key"
+                            type={showKeys['openai'] ? 'text' : 'password'}
+                            value={showKeys['openai'] ? tempKeys.openaiKey : maskKey(tempKeys.openaiKey)}
+                            onChange={(e) => setTempKeys(prev => ({ ...prev, openaiKey: e.target.value }))}
+                            placeholder="sk-..."
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => toggleKeyVisibility('openai')}
+                          >
+                            {showKeys['openai'] ? (
+                              <EyeSlash weight="fill" size={18} />
+                            ) : (
+                              <Eye weight="fill" size={18} />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Used for AI-powered image generation and chatbot responses
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="grok-key" className="flex items-center justify-between">
+                          <span>Grok AI API Key</span>
+                          {tempKeys.grokKey && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Check size={10} weight="bold" />
+                              Configured
+                            </Badge>
+                          )}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="grok-key"
+                            type={showKeys['grok'] ? 'text' : 'password'}
+                            value={showKeys['grok'] ? tempKeys.grokKey : maskKey(tempKeys.grokKey)}
+                            onChange={(e) => setTempKeys(prev => ({ ...prev, grokKey: e.target.value }))}
+                            placeholder="grok-..."
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => toggleKeyVisibility('grok')}
+                          >
+                            {showKeys['grok'] ? (
+                              <EyeSlash weight="fill" size={18} />
+                            ) : (
+                              <Eye weight="fill" size={18} />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Alternative AI provider for enhanced generation capabilities
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="grok-key">Grok AI API Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="grok-key"
-                        type={showKeys['grok'] ? 'text' : 'password'}
-                        value={showKeys['grok'] ? tempKeys.grokKey : maskKey(tempKeys.grokKey)}
-                        onChange={(e) => setTempKeys(prev => ({ ...prev, grokKey: e.target.value }))}
-                        placeholder="grok-..."
-                        className="font-mono"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => toggleKeyVisibility('grok')}
-                      >
-                        {showKeys['grok'] ? (
-                          <EyeSlash weight="fill" size={18} />
-                        ) : (
-                          <Eye weight="fill" size={18} />
-                        )}
-                      </Button>
+                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                    <h3 className="font-medium mb-3 flex items-center gap-2">
+                      <CurrencyDollar weight="fill" size={18} className="text-accent" />
+                      Payment & Billing
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="stripe-secret" className="flex items-center justify-between">
+                          <span>Stripe Secret Key</span>
+                          {tempKeys.stripeSecretKey && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Check size={10} weight="bold" />
+                              Configured
+                            </Badge>
+                          )}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="stripe-secret"
+                            type={showKeys['stripe-secret'] ? 'text' : 'password'}
+                            value={showKeys['stripe-secret'] ? tempKeys.stripeSecretKey : maskKey(tempKeys.stripeSecretKey)}
+                            onChange={(e) => setTempKeys(prev => ({ ...prev, stripeSecretKey: e.target.value }))}
+                            placeholder="sk_live_..."
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => toggleKeyVisibility('stripe-secret')}
+                          >
+                            {showKeys['stripe-secret'] ? (
+                              <EyeSlash weight="fill" size={18} />
+                            ) : (
+                              <Eye weight="fill" size={18} />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Server-side key for processing payments and managing subscriptions
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="stripe-publishable" className="flex items-center justify-between">
+                          <span>Stripe Publishable Key</span>
+                          {tempKeys.stripePublishableKey && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Check size={10} weight="bold" />
+                              Configured
+                            </Badge>
+                          )}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="stripe-publishable"
+                            type={showKeys['stripe-pub'] ? 'text' : 'password'}
+                            value={showKeys['stripe-pub'] ? tempKeys.stripePublishableKey : maskKey(tempKeys.stripePublishableKey)}
+                            onChange={(e) => setTempKeys(prev => ({ ...prev, stripePublishableKey: e.target.value }))}
+                            placeholder="pk_live_..."
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => toggleKeyVisibility('stripe-pub')}
+                          >
+                            {showKeys['stripe-pub'] ? (
+                              <EyeSlash weight="fill" size={18} />
+                            ) : (
+                              <Eye weight="fill" size={18} />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Client-side key for Stripe checkout integration
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-secret">Stripe Secret Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="stripe-secret"
-                        type={showKeys['stripe-secret'] ? 'text' : 'password'}
-                        value={showKeys['stripe-secret'] ? tempKeys.stripeSecretKey : maskKey(tempKeys.stripeSecretKey)}
-                        onChange={(e) => setTempKeys(prev => ({ ...prev, stripeSecretKey: e.target.value }))}
-                        placeholder="sk_live_..."
-                        className="font-mono"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => toggleKeyVisibility('stripe-secret')}
-                      >
-                        {showKeys['stripe-secret'] ? (
-                          <EyeSlash weight="fill" size={18} />
-                        ) : (
-                          <Eye weight="fill" size={18} />
+                  <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                    <h3 className="font-medium mb-3 flex items-center gap-2">
+                      <CreditCard weight="fill" size={18} className="text-secondary" />
+                      Banking & Financial Services
+                    </h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="bank-key" className="flex items-center justify-between">
+                        <span>Bank API Key</span>
+                        {tempKeys.bankApiKey && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Check size={10} weight="bold" />
+                            Configured
+                          </Badge>
                         )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-publishable">Stripe Publishable Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="stripe-publishable"
-                        type={showKeys['stripe-pub'] ? 'text' : 'password'}
-                        value={showKeys['stripe-pub'] ? tempKeys.stripePublishableKey : maskKey(tempKeys.stripePublishableKey)}
-                        onChange={(e) => setTempKeys(prev => ({ ...prev, stripePublishableKey: e.target.value }))}
-                        placeholder="pk_live_..."
-                        className="font-mono"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => toggleKeyVisibility('stripe-pub')}
-                      >
-                        {showKeys['stripe-pub'] ? (
-                          <EyeSlash weight="fill" size={18} />
-                        ) : (
-                          <Eye weight="fill" size={18} />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-key">Bank API Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="bank-key"
-                        type={showKeys['bank'] ? 'text' : 'password'}
-                        value={showKeys['bank'] ? tempKeys.bankApiKey : maskKey(tempKeys.bankApiKey)}
-                        onChange={(e) => setTempKeys(prev => ({ ...prev, bankApiKey: e.target.value }))}
-                        placeholder="bank_..."
-                        className="font-mono"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => toggleKeyVisibility('bank')}
-                      >
-                        {showKeys['bank'] ? (
-                          <EyeSlash weight="fill" size={18} />
-                        ) : (
-                          <Eye weight="fill" size={18} />
-                        )}
-                      </Button>
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="bank-key"
+                          type={showKeys['bank'] ? 'text' : 'password'}
+                          value={showKeys['bank'] ? tempKeys.bankApiKey : maskKey(tempKeys.bankApiKey)}
+                          onChange={(e) => setTempKeys(prev => ({ ...prev, bankApiKey: e.target.value }))}
+                          placeholder="bank_..."
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => toggleKeyVisibility('bank')}
+                        >
+                          {showKeys['bank'] ? (
+                            <EyeSlash weight="fill" size={18} />
+                          ) : (
+                            <Eye weight="fill" size={18} />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Direct bank integration for advanced payment processing and reconciliation
+                      </p>
                     </div>
                   </div>
 
                   <div className="pt-4">
-                    <Button onClick={saveKeys} className="w-full gap-2">
-                      <Check weight="bold" />
+                    <Button onClick={saveKeys} className="w-full gap-2" size="lg">
+                      <Check weight="bold" size={20} />
                       Save All Keys Securely
                     </Button>
                   </div>
 
-                  <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
                     <div className="flex gap-3">
                       <Key weight="fill" size={20} className="text-primary flex-shrink-0 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-medium mb-1">Security Notice</p>
-                        <p className="text-muted-foreground text-xs">
-                          All API keys are encrypted and stored securely. Only you have access to these credentials.
-                          Never share these keys with anyone outside your organization.
-                        </p>
+                      <div className="text-sm space-y-2">
+                        <p className="font-medium">🔒 Enterprise-Grade Security</p>
+                        <ul className="text-muted-foreground text-xs space-y-1 list-disc list-inside">
+                          <li>All API keys are encrypted using AES-256 encryption</li>
+                          <li>Keys are stored securely in isolated key storage</li>
+                          <li>Only the CEO has access to modify these credentials</li>
+                          <li>All key access is logged for audit purposes</li>
+                          <li>Keys are never exposed in logs or error messages</li>
+                        </ul>
                       </div>
                     </div>
                   </div>
