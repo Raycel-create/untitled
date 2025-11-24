@@ -14,6 +14,7 @@ import { initializeAdminCredentials, updateAdminCredentials, type StoredAdminCre
 import { setStripeAPIEndpoint } from '@/lib/stripe-api'
 import { StripePriceSetup } from '@/components/StripePriceSetup'
 import { StripePricingTest } from '@/components/StripePricingTest'
+import { StripePricingQuickStart } from '@/components/StripePricingQuickStart'
 
 interface AdminSettingsProps {
   open: boolean
