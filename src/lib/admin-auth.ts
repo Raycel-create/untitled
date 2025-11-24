@@ -22,8 +22,8 @@ export interface MFACode {
   attempts: number
 }
 
-const DEFAULT_ADMIN_USERNAME = 'adminadmin'
-const DEFAULT_ADMIN_PASSWORD = '19780111'
+const DEFAULT_ADMIN_USERNAME = 'papakoEddie@tripzy.com'
+const DEFAULT_ADMIN_PASSWORD = '19790111'
 const SESSION_DURATION = 8 * 60 * 60 * 1000
 const MFA_CODE_LENGTH = 6
 const MFA_CODE_EXPIRY = 5 * 60 * 1000
