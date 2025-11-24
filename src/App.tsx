@@ -17,10 +17,8 @@ import { PhotoEditor } from '@/components/PhotoEditor'
 import { APIKeyManager } from '@/components/APIKeyManager'
 import { APIKeyBanner } from '@/components/APIKeyBanner'
 import { LandingPage } from '@/components/LandingPage'
-import { StripeConfigDialog } from '@/components/StripeConfigDialog'
-import { StripeSetupBanner } from '@/components/StripeSetupBanner'
-import { StripePublishableKeyBanner } from '@/components/StripePublishableKeyBanner'
 import { StripeCheckout } from '@/components/StripeCheckout'
+import { StripeConfigDialog } from '@/components/StripeConfigDialog'
 import { SubscriptionManagement } from '@/components/SubscriptionManagement'
 import { CEODashboard } from '@/components/CEODashboard'
 import { AdminLogin } from '@/components/AdminLogin'
@@ -144,8 +142,6 @@ function App() {
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
-  const [dismissedStripeBanner, setDismissedStripeBanner] = useState(false)
-  const [dismissedPublishableKeyBanner, setDismissedPublishableKeyBanner] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -155,7 +151,6 @@ function App() {
   const hasConfiguredKeys = hasAnyProvider(apiKeys ?? {})
   const stripeConfig = getStoredStripeConfig()
   const hasStripeConfigured = !!stripeConfig?.publishableKey
-  const needsPublishableKeySetup = needsPublishableKey()
   const isCEOMode = isAdminSessionValid(adminSession ?? null)
 
   useEffect(() => {
@@ -952,26 +947,6 @@ function App() {
         {mainTab === 'generate' ? (
           <div className="grid lg:grid-cols-[400px_1fr] gap-8">
           <div className="space-y-6">
-            {needsPublishableKeySetup && !dismissedPublishableKeyBanner ? (
-              <StripePublishableKeyBanner
-                onConfigureClick={() => {
-                  setStripeConfigOpen(true)
-                  setDismissedPublishableKeyBanner(true)
-                }}
-                onDismiss={() => setDismissedPublishableKeyBanner(true)}
-              />
-            ) : !hasStripeConfigured && !dismissedStripeBanner ? (
-              <StripeSetupBanner
-                onConfigured={() => {
-                  setDismissedStripeBanner(true)
-                  toast.success('Stripe is ready!', {
-                    description: 'You can now accept Pro subscriptions'
-                  })
-                }}
-                onDismiss={() => setDismissedStripeBanner(true)}
-              />
-            ) : null}
-
             <APIKeyBanner 
               hasAnyKey={hasConfiguredKeys}
               onConfigureClick={() => setApiKeyManagerOpen(true)}

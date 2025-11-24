@@ -8,13 +8,15 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Lock, Eye, EyeSlash, ShieldCheck, Warning, Check, Plugs, Link, ShoppingCart } from '@phosphor-icons/react'
+import { Lock, Eye, EyeSlash, ShieldCheck, Warning, Check, Plugs, Link, ShoppingCart, CreditCard, Lightning } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { initializeAdminCredentials, updateAdminCredentials, type StoredAdminCredentials } from '@/lib/admin-auth'
 import { setStripeAPIEndpoint } from '@/lib/stripe-api'
 import { StripePriceSetup } from '@/components/StripePriceSetup'
 import { StripePricingTest } from '@/components/StripePricingTest'
 import { StripePricingQuickStart } from '@/components/StripePricingQuickStart'
+import { getStoredStripeConfig } from '@/lib/stripe'
+import { needsPublishableKey } from '@/lib/stripe-config-init'
 
 interface AdminSettingsProps {
   open: boolean
@@ -40,6 +42,10 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
   const [isTestingEndpoint, setIsTestingEndpoint] = useState(false)
   const [endpointStatus, setEndpointStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [activeTab, setActiveTab] = useState('credentials')
+  
+  const stripeConfig = getStoredStripeConfig()
+  const needsPublishableKeySetup = needsPublishableKey()
+  const hasStripeConfigured = !!stripeConfig?.publishableKey
 
   const currentCredentials = storedCredentials || initializeAdminCredentials()
 
@@ -228,10 +234,20 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="quickstart" className="gap-2">
-              <ShieldCheck size={16} />
+              <Lightning size={16} />
               Quick Start
+            </TabsTrigger>
+            <TabsTrigger value="stripe" className="gap-2 relative">
+              <CreditCard size={16} />
+              Stripe Setup
+              {(needsPublishableKeySetup || !hasStripeConfigured) && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="credentials" className="gap-2">
               <Lock size={16} />
@@ -253,16 +269,102 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
 
           <TabsContent value="quickstart" className="space-y-6 py-4">
             <StripePricingQuickStart
-              onOpenStripeConfig={() => {
-                handleClose()
-                setTimeout(() => {
-                  const event = new CustomEvent('open-stripe-config')
-                  window.dispatchEvent(event)
-                }, 100)
-              }}
+              onOpenStripeConfig={() => setActiveTab('stripe')}
               onOpenPricing={() => setActiveTab('pricing')}
               onOpenTesting={() => setActiveTab('test')}
             />
+          </TabsContent>
+
+          <TabsContent value="stripe" className="space-y-6 py-4">
+            {needsPublishableKeySetup && (
+              <Alert className="border-accent bg-accent/10">
+                <Lightning weight="fill" className="h-4 w-4 text-accent" />
+                <AlertDescription className="text-sm">
+                  Your Stripe secret key is configured! Add your publishable key to start accepting payments.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {!hasStripeConfigured && !needsPublishableKeySetup && (
+              <Alert className="border-primary bg-primary/10">
+                <Lightning weight="fill" className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-sm">
+                  Complete your Stripe setup to enable Pro subscriptions and payment processing.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Card className="p-4 bg-muted/50">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Stripe Status</Label>
+                  <Badge variant={hasStripeConfigured ? "default" : "secondary"} className="gap-1">
+                    {hasStripeConfigured ? (
+                      <>
+                        <Check weight="bold" size={12} />
+                        Configured
+                      </>
+                    ) : needsPublishableKeySetup ? (
+                      <>
+                        <Warning weight="fill" size={12} />
+                        Needs Publishable Key
+                      </>
+                    ) : (
+                      <>
+                        <Warning weight="fill" size={12} />
+                        Not Configured
+                      </>
+                    )}
+                  </Badge>
+                </div>
+                {stripeConfig?.publishableKey && (
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Publishable Key</Label>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {stripeConfig.publishableKey.substring(0, 15)}...
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <div className="space-y-4">
+              <Button
+                onClick={() => {
+                  handleClose()
+                  setTimeout(() => {
+                    const event = new CustomEvent('open-stripe-config')
+                    window.dispatchEvent(event)
+                  }, 100)
+                }}
+                className="w-full gap-2"
+                size="lg"
+              >
+                <CreditCard weight="fill" />
+                {hasStripeConfigured ? 'Update Stripe Configuration' : 'Configure Stripe Keys'}
+              </Button>
+
+              {hasStripeConfigured && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Your Stripe integration is ready to accept payments
+                </p>
+              )}
+            </div>
+
+            <Card className="p-4 bg-blue-500/10 border-blue-500/20">
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Lightning weight="bold" size={16} className="text-blue-600" />
+                  What You Need
+                </h4>
+                <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                  <li>Stripe Secret Key (sk_live_... or sk_test_...)</li>
+                  <li>Stripe Publishable Key (pk_live_... or pk_test_...)</li>
+                  <li>Create pricing plans in your Stripe Dashboard</li>
+                  <li>Configure webhook endpoint for subscription updates</li>
+                </ul>
+              </div>
+            </Card>
           </TabsContent>
 
           <TabsContent value="credentials" className="space-y-6 py-4">
