@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { initializeAdminCredentials, updateAdminCredentials, type StoredAdminCredentials } from '@/lib/admin-auth'
 import { setStripeAPIEndpoint } from '@/lib/stripe-api'
 import { StripePriceSetup } from '@/components/StripePriceSetup'
+import { StripePricingTest } from '@/components/StripePricingTest'
 
 interface AdminSettingsProps {
   open: boolean
@@ -225,7 +226,7 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
         </DialogHeader>
 
         <Tabs defaultValue="credentials" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="credentials" className="gap-2">
               <Lock size={16} />
               Credentials
@@ -234,9 +235,13 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
               <ShoppingCart size={16} />
               Pricing
             </TabsTrigger>
+            <TabsTrigger value="test" className="gap-2">
+              <ShieldCheck size={16} />
+              Test
+            </TabsTrigger>
             <TabsTrigger value="api" className="gap-2">
               <Plugs size={16} />
-              Stripe API
+              API
             </TabsTrigger>
           </TabsList>
 
@@ -416,6 +421,10 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
 
           <TabsContent value="pricing" className="space-y-6 py-4">
             <StripePriceSetup />
+          </TabsContent>
+
+          <TabsContent value="test" className="space-y-6 py-4">
+            <StripePricingTest />
           </TabsContent>
 
           <TabsContent value="api" className="space-y-6 py-4">
