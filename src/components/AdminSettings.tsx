@@ -15,8 +15,8 @@ import { setStripeAPIEndpoint } from '@/lib/stripe-api'
 import { StripePriceSetup } from '@/components/StripePriceSetup'
 import { StripePricingTest } from '@/components/StripePricingTest'
 import { StripePricingQuickStart } from '@/components/StripePricingQuickStart'
-import { getStoredStripeConfig } from '@/lib/stripe'
-import { needsPublishableKey } from '@/lib/stripe-config-init'
+import { getStoredStripeConfig, saveStripeConfig, type StripeConfig } from '@/lib/stripe'
+import { needsPublishableKey, STRIPE_LIVE_CONFIG } from '@/lib/stripe-config-init'
 
 interface AdminSettingsProps {
   open: boolean
@@ -43,6 +43,12 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
   const [endpointStatus, setEndpointStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [activeTab, setActiveTab] = useState('credentials')
   
+  const [stripePublishableKey, setStripePublishableKey] = useState('')
+  const [stripeSecretKey, setStripeSecretKey] = useState('')
+  const [showStripePublishable, setShowStripePublishable] = useState(false)
+  const [showStripeSecret, setShowStripeSecret] = useState(false)
+  const [isSavingStripe, setIsSavingStripe] = useState(false)
+  
   const stripeConfig = getStoredStripeConfig()
   const needsPublishableKeySetup = needsPublishableKey()
   const hasStripeConfigured = !!stripeConfig?.publishableKey
@@ -57,6 +63,14 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
       }
     }
     loadApiEndpoint()
+    
+    const config = getStoredStripeConfig()
+    if (config) {
+      setStripePublishableKey(config.publishableKey || '')
+      setStripeSecretKey(config.secretKey || STRIPE_LIVE_CONFIG.secretKey || '')
+    } else {
+      setStripeSecretKey(STRIPE_LIVE_CONFIG.secretKey || '')
+    }
   }, [])
 
   const resetForm = () => {
@@ -126,6 +140,42 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
     toast.success('API endpoint cleared', {
       description: 'Back to demo mode'
     })
+  }
+
+  const handleSaveStripeKeys = async () => {
+    if (!stripePublishableKey || !stripePublishableKey.startsWith('pk_')) {
+      toast.error('Invalid publishable key', {
+        description: 'Publishable key must start with pk_'
+      })
+      return
+    }
+
+    if (!stripeSecretKey || !stripeSecretKey.startsWith('sk_')) {
+      toast.error('Invalid secret key', {
+        description: 'Secret key must start with sk_'
+      })
+      return
+    }
+
+    setIsSavingStripe(true)
+
+    try {
+      const config: StripeConfig = {
+        publishableKey: stripePublishableKey,
+        secretKey: stripeSecretKey
+      }
+
+      saveStripeConfig(config)
+
+      toast.success('Stripe keys saved successfully', {
+        description: 'You can now accept payments'
+      })
+    } catch (error) {
+      toast.error('Failed to save Stripe keys')
+      console.error(error)
+    } finally {
+      setIsSavingStripe(false)
+    }
   }
 
   const handleClose = () => {
@@ -325,30 +375,90 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
                     </span>
                   </div>
                 )}
+                {stripeConfig?.secretKey && (
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Secret Key</Label>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {stripeConfig.secretKey.substring(0, 15)}...
+                    </span>
+                  </div>
+                )}
               </div>
             </Card>
 
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="stripe-secret-key">
+                  Stripe Secret Key <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="stripe-secret-key"
+                    type={showStripeSecret ? 'text' : 'password'}
+                    value={stripeSecretKey}
+                    onChange={(e) => setStripeSecretKey(e.target.value)}
+                    placeholder="sk_live_... or sk_test_..."
+                    className="pr-10 font-mono text-sm"
+                    disabled={isSavingStripe}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStripeSecret(!showStripeSecret)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showStripeSecret ? <EyeSlash size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get this from your Stripe Dashboard → Developers → API Keys
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stripe-publishable-key">
+                  Stripe Publishable Key <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="stripe-publishable-key"
+                    type={showStripePublishable ? 'text' : 'password'}
+                    value={stripePublishableKey}
+                    onChange={(e) => setStripePublishableKey(e.target.value)}
+                    placeholder="pk_live_... or pk_test_..."
+                    className="pr-10 font-mono text-sm"
+                    disabled={isSavingStripe}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStripePublishable(!showStripePublishable)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showStripePublishable ? <EyeSlash size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get this from your Stripe Dashboard → Developers → API Keys
+                </p>
+              </div>
+
               <Button
-                onClick={() => {
-                  handleClose()
-                  setTimeout(() => {
-                    const event = new CustomEvent('open-stripe-config')
-                    window.dispatchEvent(event)
-                  }, 100)
-                }}
+                onClick={handleSaveStripeKeys}
+                disabled={isSavingStripe || !stripePublishableKey || !stripeSecretKey}
                 className="w-full gap-2"
                 size="lg"
               >
-                <CreditCard weight="fill" />
-                {hasStripeConfigured ? 'Update Stripe Configuration' : 'Configure Stripe Keys'}
+                {isSavingStripe ? (
+                  <>
+                    <div className="animate-spin">⟳</div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check weight="bold" />
+                    Save Stripe Keys
+                  </>
+                )}
               </Button>
-
-              {hasStripeConfigured && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Your Stripe integration is ready to accept payments
-                </p>
-              )}
             </div>
 
             <Card className="p-4 bg-blue-500/10 border-blue-500/20">

@@ -846,20 +846,6 @@ function App() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setStripeConfigOpen(true)}
-                className="relative"
-                title="Stripe Settings"
-              >
-                <CreditCard weight="fill" size={20} />
-                {hasStripeConfigured && (
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-                  </span>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
                 onClick={() => setWebhookHandlerOpen(true)}
                 className="relative"
                 title="Stripe Webhooks"
@@ -874,6 +860,12 @@ function App() {
                 title="Admin Settings"
               >
                 <GearSix weight="fill" size={20} />
+                {(!hasStripeConfigured || needsPublishableKey()) && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
+                  </span>
+                )}
               </Button>
               {currentStatus.tier === 'pro' && (
                 <Button
