@@ -23,7 +23,8 @@ import {
   CaretRight,
   Wallet,
   CurrencyBtc,
-  Globe
+  Globe,
+  ShieldCheck
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { 
@@ -46,9 +47,10 @@ interface PaymentMethodSettingsProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   userEmail: string
+  onOpenSpendingLimits?: () => void
 }
 
-export function PaymentMethodSettings({ open, onOpenChange, userEmail }: PaymentMethodSettingsProps) {
+export function PaymentMethodSettings({ open, onOpenChange, userEmail, onOpenSpendingLimits }: PaymentMethodSettingsProps) {
   const [paymentMethods, setPaymentMethods] = useKV<PaymentMethod[]>('payment-methods', [])
   const [preferences, setPreferences] = useKV<PaymentPreferences>('payment-preferences', {
     ...initializePaymentPreferences(),
@@ -171,6 +173,33 @@ export function PaymentMethodSettings({ open, onOpenChange, userEmail }: Payment
               Manage your payment methods, billing preferences, and view transaction history
             </DialogDescription>
           </DialogHeader>
+
+          {onOpenSpendingLimits && (
+            <Card className="p-4 bg-accent/5 border-accent">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-accent/10 rounded-lg">
+                    <ShieldCheck size={24} weight="fill" className="text-accent" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Set Spending Limits</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Control your budget with spending limits and alerts
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={onOpenSpendingLimits}
+                  className="gap-2"
+                >
+                  Configure
+                  <CaretRight weight="bold" size={14} />
+                </Button>
+              </div>
+            </Card>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand, Plugs, Wallet } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand, Plugs, Wallet, ShieldCheck } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -27,6 +27,8 @@ import { GenerationProgress } from '@/components/GenerationProgress'
 import { TemplateRecommendations } from '@/components/TemplateRecommendations'
 import { WebhookHandler } from '@/components/WebhookHandler'
 import { PaymentMethodSettings } from '@/components/PaymentMethodSettings'
+import { SpendingLimitsManager } from '@/components/SpendingLimitsManager'
+import { SpendingLimitBanner } from '@/components/SpendingLimitBanner'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -35,6 +37,12 @@ import {
   SUBSCRIPTION_LIMITS,
   type SubscriptionStatus 
 } from '@/lib/subscription'
+import { 
+  SpendingLimitsConfig,
+  initializeSpendingLimits,
+  canSpend,
+  addSpendingTransaction
+} from '@/lib/spending-limits'
 import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
 import { initializeAuth, type User, type AuthState } from '@/lib/auth'
 import { getStoredStripeConfig, simulateSuccessfulPayment } from '@/lib/stripe'
@@ -130,6 +138,10 @@ function App() {
     'subscription-status',
     initializeSubscription()
   )
+  const [spendingLimitsConfig, setSpendingLimitsConfig] = useKV<SpendingLimitsConfig>(
+    'spending-limits-config',
+    initializeSpendingLimits()
+  )
   const [apiKeys] = useKV<APIKeys>('api-keys', {})
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
@@ -144,6 +156,7 @@ function App() {
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [paymentSettingsOpen, setPaymentSettingsOpen] = useState(false)
+  const [spendingLimitsOpen, setSpendingLimitsOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -464,6 +477,18 @@ function App() {
       return
     }
 
+    const estimatedCost = mode === 'video' ? 0.50 * totalGenerations : 0.10 * totalGenerations
+    const currentSpendingConfig = spendingLimitsConfig ?? initializeSpendingLimits()
+    const spendCheck = canSpend(currentSpendingConfig.limits, estimatedCost)
+    
+    if (!spendCheck.allowed) {
+      toast.error('Spending limit exceeded', {
+        description: spendCheck.reason
+      })
+      setSpendingLimitsOpen(true)
+      return
+    }
+
     const provider = getProviderForFeature(apiKeys ?? {}, mode)
     if (!provider) {
       toast.error(`No API provider configured for ${mode} generation`)
@@ -585,6 +610,25 @@ function App() {
               generationsUsed: updated.generationsUsed + 1
             }
           })
+
+          const transactionCost = 0.10
+          const { config: updatedConfig, triggeredAlerts } = addSpendingTransaction(
+            spendingLimitsConfig ?? initializeSpendingLimits(),
+            transactionCost,
+            'Image Generation',
+            'generation'
+          )
+          setSpendingLimitsConfig(updatedConfig)
+          
+          if (triggeredAlerts.length > 0) {
+            triggeredAlerts.forEach(alert => {
+              toast.warning(`Spending Alert: ${alert.name}`, {
+                description: alert.percentage 
+                  ? `You've reached ${alert.percentage}% of your spending limit`
+                  : `You've spent $${alert.threshold.toFixed(2)}`
+              })
+            })
+          }
           
           toast.success('Image generated successfully!')
         }
@@ -631,6 +675,25 @@ function App() {
             generationsUsed: updated.generationsUsed + 1
           }
         })
+
+        const transactionCost = 0.50
+        const { config: updatedConfig, triggeredAlerts } = addSpendingTransaction(
+          spendingLimitsConfig ?? initializeSpendingLimits(),
+          transactionCost,
+          'Video Generation',
+          'generation'
+        )
+        setSpendingLimitsConfig(updatedConfig)
+        
+        if (triggeredAlerts.length > 0) {
+          triggeredAlerts.forEach(alert => {
+            toast.warning(`Spending Alert: ${alert.name}`, {
+              description: alert.percentage 
+                ? `You've reached ${alert.percentage}% of your spending limit`
+                : `You've spent $${alert.threshold.toFixed(2)}`
+            })
+          })
+        }
         
         toast.success('Video generated successfully!')
       }
@@ -890,6 +953,15 @@ function App() {
                 Payments
               </Button>
               <Button
+                variant="outline"
+                onClick={() => setSpendingLimitsOpen(true)}
+                className="gap-2"
+                title="Spending Limits"
+              >
+                <ShieldCheck weight="fill" size={20} />
+                Limits
+              </Button>
+              <Button
                 variant={isCEOMode ? "default" : "outline"}
                 onClick={() => {
                   if (isCEOMode) {
@@ -953,6 +1025,10 @@ function App() {
             <APIKeyBanner 
               hasAnyKey={hasConfiguredKeys}
               onConfigureClick={() => setApiKeyManagerOpen(true)}
+            />
+
+            <SpendingLimitBanner 
+              onOpenSettings={() => setSpendingLimitsOpen(true)}
             />
 
             <UsageIndicator 
@@ -1719,6 +1795,14 @@ function App() {
         open={paymentSettingsOpen}
         onOpenChange={setPaymentSettingsOpen}
         userEmail={authState?.user?.email || ''}
+        onOpenSpendingLimits={() => {
+          setPaymentSettingsOpen(false)
+          setSpendingLimitsOpen(true)
+        }}
+      />
+      <SpendingLimitsManager
+        open={spendingLimitsOpen}
+        onOpenChange={setSpendingLimitsOpen}
       />
     </div>
   );
