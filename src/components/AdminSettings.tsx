@@ -8,7 +8,9 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Lock, Eye, EyeSlash, ShieldCheck, Warning, Check, Plugs, Link, ShoppingCart, CreditCard, Lightning } from '@phosphor-icons/react'
+import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Lock, Eye, EyeSlash, ShieldCheck, Warning, Check, Plugs, Link, ShoppingCart, CreditCard, Lightning, Wallet, Bank } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { initializeAdminCredentials, updateAdminCredentials, type StoredAdminCredentials } from '@/lib/admin-auth'
 import { setStripeAPIEndpoint } from '@/lib/stripe-api'
@@ -17,6 +19,24 @@ import { StripePricingTest } from '@/components/StripePricingTest'
 import { StripePricingQuickStart } from '@/components/StripePricingQuickStart'
 import { getStoredStripeConfig, saveStripeConfig, type StripeConfig } from '@/lib/stripe'
 import { needsPublishableKey, STRIPE_LIVE_CONFIG } from '@/lib/stripe-config-init'
+import { 
+  getPaymentGatewayConfig, 
+  savePaymentGatewayConfig, 
+  testStripeConnection,
+  testPayPalConnection,
+  testSquareConnection,
+  testPlaidConnection,
+  testAuthorizeNetConnection,
+  testBraintreeConnection,
+  getActiveGateways,
+  type PaymentGatewayConfig,
+  type StripeGatewayConfig,
+  type PayPalGatewayConfig,
+  type SquareGatewayConfig,
+  type PlaidGatewayConfig,
+  type AuthorizeNetConfig,
+  type BraintreeConfig
+} from '@/lib/payment-gateways'
 
 interface AdminSettingsProps {
   open: boolean
@@ -49,6 +69,11 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
   const [showStripeSecret, setShowStripeSecret] = useState(false)
   const [isSavingStripe, setIsSavingStripe] = useState(false)
   
+  const [paymentGateways, setPaymentGateways] = useState<PaymentGatewayConfig>({})
+  const [isSavingGateways, setIsSavingGateways] = useState(false)
+  const [testingGateway, setTestingGateway] = useState<string | null>(null)
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+  
   const stripeConfig = getStoredStripeConfig()
   const needsPublishableKeySetup = needsPublishableKey()
   const hasStripeConfigured = !!stripeConfig?.publishableKey
@@ -71,6 +96,12 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
     } else {
       setStripeSecretKey(STRIPE_LIVE_CONFIG.secretKey || '')
     }
+    
+    async function loadPaymentGateways() {
+      const gateways = await getPaymentGatewayConfig()
+      setPaymentGateways(gateways)
+    }
+    loadPaymentGateways()
   }, [])
 
   const resetForm = () => {
@@ -270,6 +301,92 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
     currentCredentials.username === 'adminadmin' && 
     currentCredentials.password === '19780111'
 
+  const handleTestGateway = async (gatewayType: string) => {
+    setTestingGateway(gatewayType)
+    
+    try {
+      let success = false
+      
+      switch (gatewayType) {
+        case 'stripe':
+          if (paymentGateways.stripe) {
+            success = await testStripeConnection(paymentGateways.stripe)
+          }
+          break
+        case 'paypal':
+          if (paymentGateways.paypal) {
+            success = await testPayPalConnection(paymentGateways.paypal)
+          }
+          break
+        case 'square':
+          if (paymentGateways.square) {
+            success = await testSquareConnection(paymentGateways.square)
+          }
+          break
+        case 'plaid':
+          if (paymentGateways.plaid) {
+            success = await testPlaidConnection(paymentGateways.plaid)
+          }
+          break
+        case 'authorize':
+          if (paymentGateways.authorize) {
+            success = await testAuthorizeNetConnection(paymentGateways.authorize)
+          }
+          break
+        case 'braintree':
+          if (paymentGateways.braintree) {
+            success = await testBraintreeConnection(paymentGateways.braintree)
+          }
+          break
+      }
+      
+      if (success) {
+        setPaymentGateways(prev => ({
+          ...prev,
+          [gatewayType]: {
+            ...prev[gatewayType as keyof PaymentGatewayConfig],
+            status: 'active',
+            lastTested: Date.now()
+          }
+        }))
+        toast.success(`${gatewayType.charAt(0).toUpperCase() + gatewayType.slice(1)} connection successful`)
+      } else {
+        setPaymentGateways(prev => ({
+          ...prev,
+          [gatewayType]: {
+            ...prev[gatewayType as keyof PaymentGatewayConfig],
+            status: 'error',
+            lastTested: Date.now()
+          }
+        }))
+        toast.error(`${gatewayType.charAt(0).toUpperCase() + gatewayType.slice(1)} connection failed`)
+      }
+    } catch (error) {
+      toast.error('Connection test failed')
+    } finally {
+      setTestingGateway(null)
+    }
+  }
+
+  const handleSaveGateways = async () => {
+    setIsSavingGateways(true)
+    
+    try {
+      await savePaymentGatewayConfig(paymentGateways)
+      toast.success('Payment gateway settings saved', {
+        description: `${getActiveGateways(paymentGateways).length} gateways configured`
+      })
+    } catch (error) {
+      toast.error('Failed to save payment gateway settings')
+    } finally {
+      setIsSavingGateways(false)
+    }
+  }
+
+  const toggleShowSecret = (key: string) => {
+    setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -284,7 +401,7 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="quickstart" className="gap-2">
               <Lightning size={16} />
               Quick Start
@@ -298,6 +415,10 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
                 </span>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="gateways" className="gap-2">
+              <Wallet size={16} />
+              Gateways
             </TabsTrigger>
             <TabsTrigger value="credentials" className="gap-2">
               <Lock size={16} />
@@ -475,6 +596,571 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
                 </ul>
               </div>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="gateways" className="space-y-6 py-4">
+            <Alert>
+              <Wallet weight="fill" className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Configure multiple payment gateways to accept payments through different providers. All credentials are stored securely.
+              </AlertDescription>
+            </Alert>
+
+            <Card className="p-4 bg-muted/50">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Active Gateways</Label>
+                  <Badge variant="default" className="gap-1">
+                    {getActiveGateways(paymentGateways).length} Configured
+                  </Badge>
+                </div>
+                {getActiveGateways(paymentGateways).length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {getActiveGateways(paymentGateways).map(gateway => (
+                      <Badge key={gateway} variant="outline" className="gap-1">
+                        <Check weight="bold" size={12} />
+                        {gateway}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <div className="space-y-6">
+              <Card className="p-6 border-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <CreditCard weight="fill" size={24} className="text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Stripe</h4>
+                        <p className="text-xs text-muted-foreground">Credit cards, ACH, and more</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={paymentGateways.stripe?.enabled || false}
+                      onCheckedChange={(checked) => {
+                        setPaymentGateways(prev => ({
+                          ...prev,
+                          stripe: {
+                            ...prev.stripe,
+                            enabled: checked,
+                            publishableKey: prev.stripe?.publishableKey || '',
+                            secretKey: prev.stripe?.secretKey || '',
+                            environment: prev.stripe?.environment || 'test',
+                            status: prev.stripe?.status || 'inactive'
+                          } as StripeGatewayConfig
+                        }))
+                      }}
+                    />
+                  </div>
+                  
+                  {paymentGateways.stripe?.enabled && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Environment</Label>
+                          <Select
+                            value={paymentGateways.stripe.environment}
+                            onValueChange={(value: 'test' | 'live') => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                stripe: { ...prev.stripe!, environment: value }
+                              }))
+                            }}
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="test">Test</SelectItem>
+                              <SelectItem value="live">Live</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Status</Label>
+                          <Badge variant={paymentGateways.stripe.status === 'active' ? 'default' : 'secondary'} className="w-full justify-center">
+                            {paymentGateways.stripe.status}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Publishable Key</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['stripe-pub'] ? 'text' : 'password'}
+                            value={paymentGateways.stripe.publishableKey}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                stripe: { ...prev.stripe!, publishableKey: e.target.value }
+                              }))
+                            }}
+                            placeholder="pk_test_..."
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('stripe-pub')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['stripe-pub'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Secret Key</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['stripe-sec'] ? 'text' : 'password'}
+                            value={paymentGateways.stripe.secretKey}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                stripe: { ...prev.stripe!, secretKey: e.target.value }
+                              }))
+                            }}
+                            placeholder="sk_test_..."
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('stripe-sec')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['stripe-sec'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Webhook Secret (Optional)</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['stripe-webhook'] ? 'text' : 'password'}
+                            value={paymentGateways.stripe.webhookSecret || ''}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                stripe: { ...prev.stripe!, webhookSecret: e.target.value }
+                              }))
+                            }}
+                            placeholder="whsec_..."
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('stripe-webhook')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['stripe-webhook'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTestGateway('stripe')}
+                        disabled={testingGateway === 'stripe'}
+                        className="w-full"
+                      >
+                        {testingGateway === 'stripe' ? 'Testing...' : 'Test Connection'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <Wallet weight="fill" size={24} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">PayPal</h4>
+                        <p className="text-xs text-muted-foreground">PayPal checkout and subscriptions</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={paymentGateways.paypal?.enabled || false}
+                      onCheckedChange={(checked) => {
+                        setPaymentGateways(prev => ({
+                          ...prev,
+                          paypal: {
+                            ...prev.paypal,
+                            enabled: checked,
+                            clientId: prev.paypal?.clientId || '',
+                            clientSecret: prev.paypal?.clientSecret || '',
+                            environment: prev.paypal?.environment || 'sandbox',
+                            status: prev.paypal?.status || 'inactive'
+                          } as PayPalGatewayConfig
+                        }))
+                      }}
+                    />
+                  </div>
+                  
+                  {paymentGateways.paypal?.enabled && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Environment</Label>
+                          <Select
+                            value={paymentGateways.paypal.environment}
+                            onValueChange={(value: 'sandbox' | 'live') => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                paypal: { ...prev.paypal!, environment: value }
+                              }))
+                            }}
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sandbox">Sandbox</SelectItem>
+                              <SelectItem value="live">Live</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Status</Label>
+                          <Badge variant={paymentGateways.paypal.status === 'active' ? 'default' : 'secondary'} className="w-full justify-center">
+                            {paymentGateways.paypal.status}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Client ID</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['paypal-client'] ? 'text' : 'password'}
+                            value={paymentGateways.paypal.clientId}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                paypal: { ...prev.paypal!, clientId: e.target.value }
+                              }))
+                            }}
+                            placeholder="Enter PayPal Client ID"
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('paypal-client')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['paypal-client'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Client Secret</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['paypal-secret'] ? 'text' : 'password'}
+                            value={paymentGateways.paypal.clientSecret}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                paypal: { ...prev.paypal!, clientSecret: e.target.value }
+                              }))
+                            }}
+                            placeholder="Enter PayPal Client Secret"
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('paypal-secret')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['paypal-secret'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTestGateway('paypal')}
+                        disabled={testingGateway === 'paypal'}
+                        className="w-full"
+                      >
+                        {testingGateway === 'paypal' ? 'Testing...' : 'Test Connection'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <CreditCard weight="fill" size={24} className="text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Square</h4>
+                        <p className="text-xs text-muted-foreground">Square payments and POS</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={paymentGateways.square?.enabled || false}
+                      onCheckedChange={(checked) => {
+                        setPaymentGateways(prev => ({
+                          ...prev,
+                          square: {
+                            ...prev.square,
+                            enabled: checked,
+                            applicationId: prev.square?.applicationId || '',
+                            accessToken: prev.square?.accessToken || '',
+                            environment: prev.square?.environment || 'sandbox',
+                            status: prev.square?.status || 'inactive'
+                          } as SquareGatewayConfig
+                        }))
+                      }}
+                    />
+                  </div>
+                  
+                  {paymentGateways.square?.enabled && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Environment</Label>
+                          <Select
+                            value={paymentGateways.square.environment}
+                            onValueChange={(value: 'sandbox' | 'production') => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                square: { ...prev.square!, environment: value }
+                              }))
+                            }}
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sandbox">Sandbox</SelectItem>
+                              <SelectItem value="production">Production</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Status</Label>
+                          <Badge variant={paymentGateways.square.status === 'active' ? 'default' : 'secondary'} className="w-full justify-center">
+                            {paymentGateways.square.status}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Application ID</Label>
+                        <Input
+                          value={paymentGateways.square.applicationId}
+                          onChange={(e) => {
+                            setPaymentGateways(prev => ({
+                              ...prev,
+                              square: { ...prev.square!, applicationId: e.target.value }
+                            }))
+                          }}
+                          placeholder="Enter Square Application ID"
+                          className="font-mono text-xs h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Access Token</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['square-token'] ? 'text' : 'password'}
+                            value={paymentGateways.square.accessToken}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                square: { ...prev.square!, accessToken: e.target.value }
+                              }))
+                            }}
+                            placeholder="Enter Square Access Token"
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('square-token')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['square-token'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTestGateway('square')}
+                        disabled={testingGateway === 'square'}
+                        className="w-full"
+                      >
+                        {testingGateway === 'square' ? 'Testing...' : 'Test Connection'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500/10 rounded-lg">
+                        <Bank weight="fill" size={24} className="text-purple-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Plaid</h4>
+                        <p className="text-xs text-muted-foreground">Bank account connections</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={paymentGateways.plaid?.enabled || false}
+                      onCheckedChange={(checked) => {
+                        setPaymentGateways(prev => ({
+                          ...prev,
+                          plaid: {
+                            ...prev.plaid,
+                            enabled: checked,
+                            clientId: prev.plaid?.clientId || '',
+                            secret: prev.plaid?.secret || '',
+                            environment: prev.plaid?.environment || 'sandbox',
+                            status: prev.plaid?.status || 'inactive'
+                          } as PlaidGatewayConfig
+                        }))
+                      }}
+                    />
+                  </div>
+                  
+                  {paymentGateways.plaid?.enabled && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Environment</Label>
+                          <Select
+                            value={paymentGateways.plaid.environment}
+                            onValueChange={(value: 'sandbox' | 'development' | 'production') => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                plaid: { ...prev.plaid!, environment: value }
+                              }))
+                            }}
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sandbox">Sandbox</SelectItem>
+                              <SelectItem value="development">Development</SelectItem>
+                              <SelectItem value="production">Production</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Status</Label>
+                          <Badge variant={paymentGateways.plaid.status === 'active' ? 'default' : 'secondary'} className="w-full justify-center">
+                            {paymentGateways.plaid.status}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Client ID</Label>
+                        <Input
+                          value={paymentGateways.plaid.clientId}
+                          onChange={(e) => {
+                            setPaymentGateways(prev => ({
+                              ...prev,
+                              plaid: { ...prev.plaid!, clientId: e.target.value }
+                            }))
+                          }}
+                          placeholder="Enter Plaid Client ID"
+                          className="font-mono text-xs h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Secret</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['plaid-secret'] ? 'text' : 'password'}
+                            value={paymentGateways.plaid.secret}
+                            onChange={(e) => {
+                              setPaymentGateways(prev => ({
+                                ...prev,
+                                plaid: { ...prev.plaid!, secret: e.target.value }
+                              }))
+                            }}
+                            placeholder="Enter Plaid Secret"
+                            className="pr-10 font-mono text-xs h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleShowSecret('plaid-secret')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showSecrets['plaid-secret'] ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTestGateway('plaid')}
+                        disabled={testingGateway === 'plaid'}
+                        className="w-full"
+                      >
+                        {testingGateway === 'plaid' ? 'Testing...' : 'Test Connection'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setPaymentGateways({})}
+                  className="flex-1"
+                >
+                  Reset All
+                </Button>
+                <Button
+                  onClick={handleSaveGateways}
+                  disabled={isSavingGateways}
+                  className="flex-1 gap-2"
+                >
+                  {isSavingGateways ? (
+                    <>
+                      <div className="animate-spin">⟳</div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check weight="bold" />
+                      Save Gateways
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="credentials" className="space-y-6 py-4">
