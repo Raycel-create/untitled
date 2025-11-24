@@ -1415,7 +1415,7 @@ function App() {
 
           <div>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
+              <h2 className="font-semibold text-sm">
                 Your {mode === 'image' ? 'Images' : 'Videos'} ({filteredGallery.length})
               </h2>
             </div>
@@ -1437,7 +1437,7 @@ function App() {
                 </div>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-2 base:grid-cols-3 gap-4">
                 {filteredGallery.map((item) => (
                   <Card
                     key={item.id}
@@ -1486,7 +1486,6 @@ function App() {
           />
         )}
       </div>
-
       <Dialog open={!!selectedMedia} onOpenChange={() => setSelectedMedia(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1546,7 +1545,6 @@ function App() {
           )}
         </DialogContent>
       </Dialog>
-
       <Dialog open={editingImageIndex !== null} onOpenChange={() => cancelImageEdits()}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1680,7 +1678,6 @@ function App() {
           )}
         </DialogContent>
       </Dialog>
-
       <AIAssistant
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
@@ -1688,7 +1685,6 @@ function App() {
         onApplyPrompt={(newPrompt) => setPrompt(newPrompt)}
         mode={mode}
       />
-
       <SubscriptionModal
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
@@ -1697,13 +1693,11 @@ function App() {
         subscriptionStatus={currentStatus}
         reason={upgradeReason}
       />
-
       <StripeConfigDialog
         open={stripeConfigOpen}
         onOpenChange={setStripeConfigOpen}
         onConfigured={handleStripeConfigured}
       />
-
       <StripeCheckout
         open={stripeCheckoutOpen}
         onOpenChange={setStripeCheckoutOpen}
@@ -1715,7 +1709,6 @@ function App() {
           setStripeConfigOpen(true)
         }}
       />
-
       <SubscriptionManagement
         open={subscriptionManagementOpen}
         onOpenChange={setSubscriptionManagementOpen}
@@ -1723,12 +1716,10 @@ function App() {
         userId={authState?.user?.id || 'default-user'}
         onCanceled={handleSubscriptionCanceled}
       />
-
       <APIKeyManager
         open={apiKeyManagerOpen}
         onOpenChange={setApiKeyManagerOpen}
       />
-
       <AdminLogin
         open={adminLoginOpen}
         onOpenChange={setAdminLoginOpen}
@@ -1736,12 +1727,10 @@ function App() {
           setAdminSession(createAdminSession())
         }}
       />
-
       <AdminSettings
         open={adminSettingsOpen}
         onOpenChange={setAdminSettingsOpen}
       />
-
       <WebhookHandler
         open={webhookHandlerOpen}
         onOpenChange={setWebhookHandlerOpen}
@@ -1749,7 +1738,7 @@ function App() {
         currentUserId={authState?.user?.id || 'default-user'}
       />
     </div>
-  )
+  );
 }
 
 export default App
