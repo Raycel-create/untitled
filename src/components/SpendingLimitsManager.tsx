@@ -23,7 +23,8 @@ import {
   CurrencyDollar,
   ShieldCheck,
   Receipt,
-  ArrowRight
+  ArrowRight,
+  EnvelopeSimple
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { 
@@ -44,6 +45,7 @@ import {
   getPeriodDaysRemaining,
   generateMockSpendingHistory
 } from '@/lib/spending-limits'
+import { EmailSettings } from '@/components/EmailSettings'
 
 interface SpendingLimitsManagerProps {
   open: boolean
@@ -62,6 +64,7 @@ export function SpendingLimitsManager({ open, onOpenChange }: SpendingLimitsMana
   const [isAddingLimit, setIsAddingLimit] = useState(false)
   const [isAddingAlert, setIsAddingAlert] = useState(false)
   const [selectedLimitId, setSelectedLimitId] = useState<string | null>(null)
+  const [emailSettingsOpen, setEmailSettingsOpen] = useState(false)
   
   const [newLimitAmount, setNewLimitAmount] = useState('')
   const [newLimitPeriod, setNewLimitPeriod] = useState<LimitPeriod>('monthly')
@@ -84,9 +87,22 @@ export function SpendingLimitsManager({ open, onOpenChange }: SpendingLimitsMana
 
     const newLimit = createSpendingLimit(amount, newLimitPeriod, newLimitBlock)
     
+    const alert80 = createSpendingAlert(
+      '80% Budget Alert',
+      amount * 0.8,
+      80
+    )
+    alert80.frequency = 'once'
+    alert80.channels = ['email']
+    
+    const limitWith80Alert = {
+      ...newLimit,
+      alerts: [alert80]
+    }
+    
     setConfig(current => ({
       ...(current ?? initializeSpendingLimits()),
-      limits: [...(current?.limits ?? []), newLimit]
+      limits: [...(current?.limits ?? []), limitWith80Alert]
     }))
     
     setNewLimitAmount('')
@@ -95,7 +111,7 @@ export function SpendingLimitsManager({ open, onOpenChange }: SpendingLimitsMana
     setIsAddingLimit(false)
     
     toast.success('Spending limit added', {
-      description: `${formatPeriod(newLimitPeriod)} limit of $${amount.toFixed(2)} created`
+      description: `${formatPeriod(newLimitPeriod)} limit with 80% email alert created`
     })
   }
 
@@ -233,13 +249,25 @@ export function SpendingLimitsManager({ open, onOpenChange }: SpendingLimitsMana
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-2xl">
-            <ShieldCheck weight="fill" size={28} />
-            Spending Limits & Alerts
-          </DialogTitle>
-          <DialogDescription>
-            Set spending limits and configure alerts to stay on top of your budget
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <ShieldCheck weight="fill" size={28} />
+                Spending Limits & Alerts
+              </DialogTitle>
+              <DialogDescription>
+                Set spending limits and configure alerts to stay on top of your budget
+              </DialogDescription>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setEmailSettingsOpen(true)}
+              className="gap-2"
+            >
+              <EnvelopeSimple weight="fill" size={16} />
+              Email Settings
+            </Button>
+          </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -758,6 +786,7 @@ export function SpendingLimitsManager({ open, onOpenChange }: SpendingLimitsMana
           </TabsContent>
         </Tabs>
       </DialogContent>
+      <EmailSettings open={emailSettingsOpen} onOpenChange={setEmailSettingsOpen} />
     </Dialog>
   )
 }

@@ -43,6 +43,13 @@ import {
   canSpend,
   addSpendingTransaction
 } from '@/lib/spending-limits'
+import { 
+  EmailNotificationConfig,
+  EmailNotification,
+  initializeEmailConfig,
+  sendBudgetAlert,
+  sendSpendingLimitAlert
+} from '@/lib/email-notifications'
 import { APIKeys, hasAnyProvider, getProviderForFeature } from '@/lib/api-keys'
 import { initializeAuth, type User, type AuthState } from '@/lib/auth'
 import { getStoredStripeConfig, simulateSuccessfulPayment } from '@/lib/stripe'
@@ -142,6 +149,8 @@ function App() {
     'spending-limits-config',
     initializeSpendingLimits()
   )
+  const [emailConfig] = useKV<EmailNotificationConfig>('email-notifications-config', initializeEmailConfig())
+  const [emailHistory, setEmailHistory] = useKV<EmailNotification[]>('email-history', [])
   const [apiKeys] = useKV<APIKeys>('api-keys', {})
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
@@ -621,12 +630,55 @@ function App() {
           setSpendingLimitsConfig(updatedConfig)
           
           if (triggeredAlerts.length > 0) {
-            triggeredAlerts.forEach(alert => {
+            const currentEmailConfig = emailConfig ?? initializeEmailConfig()
+            
+            triggeredAlerts.forEach(async (alert) => {
               toast.warning(`Spending Alert: ${alert.name}`, {
                 description: alert.percentage 
                   ? `You've reached ${alert.percentage}% of your spending limit`
                   : `You've spent $${alert.threshold.toFixed(2)}`
               })
+              
+              if (currentEmailConfig.enabled && currentEmailConfig.recipientEmail && alert.channels.includes('email')) {
+                try {
+                  let emailNotification: EmailNotification
+                  
+                  if (alert.percentage !== undefined) {
+                    const limit = updatedConfig.limits.find(l => l.alerts.some(a => a.id === alert.id))
+                    if (limit) {
+                      emailNotification = await sendBudgetAlert(
+                        currentEmailConfig.recipientEmail,
+                        alert.percentage,
+                        limit.currentSpend,
+                        limit.amount,
+                        limit.period
+                      )
+                    } else {
+                      emailNotification = await sendSpendingLimitAlert(
+                        currentEmailConfig.recipientEmail,
+                        alert.name,
+                        updatedConfig.totalSpendThisMonth,
+                        alert.threshold
+                      )
+                    }
+                  } else {
+                    emailNotification = await sendSpendingLimitAlert(
+                      currentEmailConfig.recipientEmail,
+                      alert.name,
+                      updatedConfig.totalSpendThisMonth,
+                      alert.threshold
+                    )
+                  }
+                  
+                  setEmailHistory(current => [emailNotification, ...(current ?? [])].slice(0, 50))
+                  
+                  toast.info('Email alert sent', {
+                    description: `Notification sent to ${currentEmailConfig.recipientEmail}`
+                  })
+                } catch (error) {
+                  console.error('Failed to send email alert:', error)
+                }
+              }
             })
           }
           
@@ -686,12 +738,55 @@ function App() {
         setSpendingLimitsConfig(updatedConfig)
         
         if (triggeredAlerts.length > 0) {
-          triggeredAlerts.forEach(alert => {
+          const currentEmailConfig = emailConfig ?? initializeEmailConfig()
+          
+          triggeredAlerts.forEach(async (alert) => {
             toast.warning(`Spending Alert: ${alert.name}`, {
               description: alert.percentage 
                 ? `You've reached ${alert.percentage}% of your spending limit`
                 : `You've spent $${alert.threshold.toFixed(2)}`
             })
+            
+            if (currentEmailConfig.enabled && currentEmailConfig.recipientEmail && alert.channels.includes('email')) {
+              try {
+                let emailNotification: EmailNotification
+                
+                if (alert.percentage !== undefined) {
+                  const limit = updatedConfig.limits.find(l => l.alerts.some(a => a.id === alert.id))
+                  if (limit) {
+                    emailNotification = await sendBudgetAlert(
+                      currentEmailConfig.recipientEmail,
+                      alert.percentage,
+                      limit.currentSpend,
+                      limit.amount,
+                      limit.period
+                    )
+                  } else {
+                    emailNotification = await sendSpendingLimitAlert(
+                      currentEmailConfig.recipientEmail,
+                      alert.name,
+                      updatedConfig.totalSpendThisMonth,
+                      alert.threshold
+                    )
+                  }
+                } else {
+                  emailNotification = await sendSpendingLimitAlert(
+                    currentEmailConfig.recipientEmail,
+                    alert.name,
+                    updatedConfig.totalSpendThisMonth,
+                    alert.threshold
+                  )
+                }
+                
+                setEmailHistory(current => [emailNotification, ...(current ?? [])].slice(0, 50))
+                
+                toast.info('Email alert sent', {
+                  description: `Notification sent to ${currentEmailConfig.recipientEmail}`
+                })
+              } catch (error) {
+                console.error('Failed to send email alert:', error)
+              }
+            }
           })
         }
         
