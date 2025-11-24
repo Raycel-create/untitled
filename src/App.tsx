@@ -161,6 +161,16 @@ function App() {
   useEffect(() => {
     setSubscriptionStatus(current => resetMonthlyUsage(current ?? initializeSubscription()))
     initializeStripeConfig()
+
+    const handleOpenStripeConfig = () => {
+      setStripeConfigOpen(true)
+    }
+
+    window.addEventListener('open-stripe-config', handleOpenStripeConfig)
+    
+    return () => {
+      window.removeEventListener('open-stripe-config', handleOpenStripeConfig)
+    }
   }, [])
 
   useEffect(() => {
