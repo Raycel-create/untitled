@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand, Plugs } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon, VideoCamera, Download, Trash, X, Play, Pause, Upload, PencilSimple, FlipHorizontal, ArrowsClockwise, ArrowCounterClockwise, Check, ChatCircleDots, Crown, Lightning, Scissors, Key, SignOut, CreditCard, GearSix, ArrowsOut, Stack, MagicWand, Plugs, Wallet } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { AIAssistant } from '@/components/AIAssistant'
 import { SubscriptionModal } from '@/components/SubscriptionModal'
@@ -26,6 +26,7 @@ import { AdminSettings } from '@/components/AdminSettings'
 import { GenerationProgress } from '@/components/GenerationProgress'
 import { TemplateRecommendations } from '@/components/TemplateRecommendations'
 import { WebhookHandler } from '@/components/WebhookHandler'
+import { PaymentMethodSettings } from '@/components/PaymentMethodSettings'
 import { 
   initializeSubscription, 
   resetMonthlyUsage, 
@@ -142,6 +143,7 @@ function App() {
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   const [adminSettingsOpen, setAdminSettingsOpen] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
+  const [paymentSettingsOpen, setPaymentSettingsOpen] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
@@ -878,6 +880,15 @@ function App() {
                   Manage Pro
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={() => setPaymentSettingsOpen(true)}
+                className="gap-2"
+                title="Payment Methods"
+              >
+                <Wallet weight="fill" size={20} />
+                Payments
+              </Button>
               <Button
                 variant={isCEOMode ? "default" : "outline"}
                 onClick={() => {
@@ -1703,6 +1714,11 @@ function App() {
         onOpenChange={setWebhookHandlerOpen}
         onSubscriptionUpdate={handleWebhookSubscriptionUpdate}
         currentUserId={authState?.user?.id || 'default-user'}
+      />
+      <PaymentMethodSettings
+        open={paymentSettingsOpen}
+        onOpenChange={setPaymentSettingsOpen}
+        userEmail={authState?.user?.email || ''}
       />
     </div>
   );
