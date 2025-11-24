@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sparkle, Lightning, Crown, Check, Image as ImageIcon, VideoCamera, Shield } from '@phosphor-icons/react'
-import { toast } from 'sonner'
+import { toast, Toaster } from 'sonner'
 import { validateEmail, validatePassword, createUser } from '@/lib/auth'
 import type { User } from '@/lib/auth'
 
@@ -65,6 +65,7 @@ export function LandingPage({ onAuthenticate }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <Toaster position="top-right" richColors />
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-accent/20 -z-10" />
       
       <div className="container mx-auto px-4 py-16">
