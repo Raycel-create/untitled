@@ -39,6 +39,7 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
   const [apiEndpoint, setApiEndpoint] = useState('')
   const [isTestingEndpoint, setIsTestingEndpoint] = useState(false)
   const [endpointStatus, setEndpointStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [activeTab, setActiveTab] = useState('credentials')
 
   const currentCredentials = storedCredentials || initializeAdminCredentials()
 
@@ -226,8 +227,12 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="credentials" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="quickstart" className="gap-2">
+              <ShieldCheck size={16} />
+              Quick Start
+            </TabsTrigger>
             <TabsTrigger value="credentials" className="gap-2">
               <Lock size={16} />
               Credentials
@@ -245,6 +250,20 @@ export function AdminSettings({ open, onOpenChange }: AdminSettingsProps) {
               API
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="quickstart" className="space-y-6 py-4">
+            <StripePricingQuickStart
+              onOpenStripeConfig={() => {
+                handleClose()
+                setTimeout(() => {
+                  const event = new CustomEvent('open-stripe-config')
+                  window.dispatchEvent(event)
+                }, 100)
+              }}
+              onOpenPricing={() => setActiveTab('pricing')}
+              onOpenTesting={() => setActiveTab('test')}
+            />
+          </TabsContent>
 
           <TabsContent value="credentials" className="space-y-6 py-4">
             {isUsingDefaultCredentials && (
